@@ -42,12 +42,6 @@ int main(int argc, char *argv[]) {
 		goto out;
 	}
 
-	err = UwacDisplayWaitReady(display, 100);
-	if (err != UWAC_SUCCESS) {
-		fprintf(stderr, "display not ready: %s\n", UwacErrorString(err));
-		goto out;
-	}
-
 	/* let's query some interfaces, we're expecting to be there */
 	for (i = 0; interface_names[i]; i++) {
 		err = UwacDisplayQueryInterfaceVersion(display, interface_names[i], &version);

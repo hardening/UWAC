@@ -107,3 +107,16 @@ UwacOutput *UwacCreateOutput(UwacDisplay *d, uint32_t id, uint32_t version) {
 	wl_list_insert(d->outputs.prev, &o->link);
 	return o;
 }
+
+int UwacDestroyOutput(UwacOutput *output) {
+	if (output->make)
+		free(output->make);
+	if (output->model)
+		free(output->model);
+
+	wl_output_destroy(output->output);
+	wl_list_remove(&output->link);
+	free(output);
+
+	return UWAC_SUCCESS;
+}

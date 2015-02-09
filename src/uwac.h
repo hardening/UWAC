@@ -24,13 +24,14 @@
 #define __UWAC_H_
 
 #include <wayland-client.h>
+#include <xdg-shell-client-protocol.h>
 #include <stdbool.h>
 
 typedef struct uwac_size UwacSize;
 typedef struct uwac_task UwacTask;
 typedef struct uwac_display UwacDisplay;
 typedef struct uwac_output UwacOutput;
-typedef struct uwac_seat UwacWindow;
+typedef struct uwac_window UwacWindow;
 typedef struct uwac_seat UwacSeat;
 
 
@@ -68,6 +69,61 @@ struct uwac_task {
 	struct wl_list link;
 };
 
+/** @brief */
+enum {
+	UWAC_EVENT_CONFIGURE,
+	UWAC_EVENT_MOUSE_ENTER,
+	UWAC_EVENT_MOUSE_LEAVE,
+	UWAC_EVENT_MOUSE_MOTION,
+	UWAC_EVENT_MOUSE_BUTTONS,
+	UWAC_EVENT_TOUCH,
+	UWAC_EVENT_KEY,
+	UWAC_EVENT_FRAME_DONE
+};
+
+struct uwac_mouse_enter_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+};
+typedef struct uwac_mouse_enter_event UwacMouseEnterLeaveEvent;
+
+struct uwac_mouse_motion_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+	uint32_t x, y;
+};
+typedef struct uwac_mouse_motion_event UwacMouseMotionEvent;
+
+struct uwac_frame_done_event {
+	int type;
+	UwacWindow *window;
+};
+typedef struct uwac_frame_done_event UwacFrameDoneEvent;
+
+struct uwac_key_event {
+	int type;
+	UwacWindow *window;
+	uint32_t sym;
+	bool pressed;
+};
+typedef struct uwac_key_event UwacKeyEvent;
+
+
+/** @brief */
+struct uwac_event {
+	union {
+		int type;
+		UwacMouseEnterLeaveEvent mouse_enter_leave;
+		UwacMouseMotionEvent mouse_motion;
+		UwacFrameDoneEvent frame_done;
+		UwacKeyEvent key;
+	};
+
+};
+typedef struct uwac_event UwacEvent;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -79,16 +135,6 @@ extern "C" {
  * @return
  */
 UwacDisplay *UwacOpenDisplay(const char *name, int *err);
-
-/**
- * Waits for milli milliseconds to receive items we require from a compositor.
- * For now we require to receive the list of SHM formats, at least one output and a seat.
- *
- * @param display
- * @param milliseconds
- * @return UWAC_SUCCESS if the display is ready, UWAC_TIMEDOUT otherwise
- */
-int UwacDisplayWaitReady(UwacDisplay *display, int milli);
 
 /**
  *
@@ -184,6 +230,44 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
  * @return if the operation completed successfully
  */
 int UwacDestroyWindow(UwacWindow *window);
+
+/**
+ *	retrieves a pointer on the current window content to draw a frame
+ * @param window the UwacWindow
+ * @return a pointer on the current window content
+ */
+void *UwacWindowGetDrawingBuffer(UwacWindow *window);
+
+/**
+ *	sets a rectangle as dirty for the next frame of a window
+ *
+ * @param window the UwacWindow
+ * @param x left coordinate
+ * @param y top coordinate
+ * @param width the width of the dirty rectangle
+ * @param height the height of the dirty rectangle
+ * @return UWAC_SUCCESS on sucess, an Uwac error otherwise
+ */
+int UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+
+/**
+ *
+ * @param window
+ * @param copyContentForNextFrame
+ * @return
+ */
+int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame);
+
+
+/** Waits until an event occurs, and when it's there copy the event from the queue to
+ * event.
+ *
+ * @param display the Uwac display
+ * @param event the event to fill
+ * @return if the operation completed successfully
+ */
+int UwacNextEvent(UwacDisplay *display, UwacEvent *event);
+
 
 #ifdef __cplusplus
 }

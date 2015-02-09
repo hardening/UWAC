@@ -34,6 +34,8 @@
 #define TARGET_SHM_INTERFACE 1
 #define TARGET_DDM_INTERFACE 1
 #define TARGET_SEAT_INTERFACE 4
+#define TARGET_XDG_VERSION 4 /* The version of xdg-shell that we implement */
+
 
 
 static void cb_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
@@ -52,6 +54,17 @@ static void cb_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 struct wl_shm_listener shm_listener = {
 	cb_shm_format
 };
+
+static void xdg_shell_ping(void *data, struct xdg_shell *shell, uint32_t serial)
+{
+	xdg_shell_pong(shell, serial);
+}
+
+static const struct xdg_shell_listener xdg_shell_listener = {
+	xdg_shell_ping,
+};
+
+
 
 static void registry_handle_global(void *data, struct wl_registry *registry, uint32_t id,
 		       const char *interface, uint32_t version)
@@ -77,11 +90,11 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		UwacSeatNew(d, id, min(version, TARGET_SEAT_INTERFACE));
 	} else if (strcmp(interface, "wl_data_device_manager") == 0) {
 		d->data_device_manager = wl_registry_bind(registry, id, &wl_data_device_manager_interface, min(TARGET_DDM_INTERFACE, version));
-#if 0
 	} else if (strcmp(interface, "xdg_shell") == 0) {
 		d->xdg_shell = wl_registry_bind(registry, id, &xdg_shell_interface, 1);
-		/*xdg_shell_use_unstable_version(d->xdg_shell, XDG_VERSION);
-		xdg_shell_add_listener(d->xdg_shell, &xdg_shell_listener, d);*/
+		xdg_shell_use_unstable_version(d->xdg_shell, TARGET_XDG_VERSION);
+		xdg_shell_add_listener(d->xdg_shell, &xdg_shell_listener, d);
+#if 0
 	} else if (strcmp(interface, "text_cursor_position") == 0) {
 		d->text_cursor_position = wl_registry_bind(registry, id, &text_cursor_position_interface, 1);
 #endif
@@ -122,6 +135,12 @@ static void registry_handle_global_remove(void *data, struct wl_registry *regist
 		free(global->interface);
 		free(global);
 	}
+}
+
+void UwacDestroyGlobal(UwacGlobal *global) {
+	free(global->interface);
+	wl_list_remove(&global->link);
+	free(global);
 }
 
 void *display_bind(UwacDisplay *display, uint32_t name, const struct wl_interface *interface, uint32_t version) {
@@ -217,7 +236,7 @@ UwacDisplay *UwacOpenDisplay(const char *name, int *err) {
 	ret->registry = wl_display_get_registry(ret->display);
 	wl_registry_add_listener(ret->registry, &registry_listener, ret);
 
-	if (wl_display_dispatch(ret->display) < 0) {
+	if ((wl_display_roundtrip(ret->display) < 0) || (wl_display_roundtrip(ret->display) < 0)) {
 		fprintf(stderr, "Failed to process Wayland connection: %m\n");
 		*err = UWAC_ERROR_UNABLE_TO_CONNECT;
 		goto out_free_registry;
@@ -273,40 +292,6 @@ int UwacDisplayDispatch(UwacDisplay *display, int timeout) {
 	return 1;
 }
 
-static bool UwacDisplayIsReady(UwacDisplay *display) {
-	return wl_list_length(&display->seats) &&
-			wl_list_length(&display->outputs) &&
-			display->shm &&
-			display->shm_formats_nb;
-}
-
-int UwacDisplayWaitReady(UwacDisplay *display, int milli) {
-	struct timespec now;
-	uint64_t dueUsecs, nowUsecs, milliToDueTime;
-	int ret;
-	if (!display)
-		return UWAC_ERROR_INVALID_DISPLAY;
-
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	dueUsecs = now.tv_sec * 1000 * 1000 + now.tv_nsec + milli * 1000;
-
-	while (!UwacDisplayIsReady(display)) {
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		nowUsecs = now.tv_sec * 1000 * 1000 + now.tv_nsec;
-
-		if (nowUsecs > dueUsecs )
-			return UWAC_TIMEDOUT;
-
-		milliToDueTime = (dueUsecs - nowUsecs) / 1000;
-		if (!milliToDueTime)
-			return UWAC_TIMEDOUT;
-
-		ret = UwacDisplayDispatch(display, milliToDueTime);
-		if (ret <= 0)
-			return UWAC_ERROR_CLOSED;
-	}
-	return UWAC_SUCCESS;
-}
 
 
 int UwacDisplayGetLastError(const UwacDisplay *display) {
@@ -314,8 +299,44 @@ int UwacDisplayGetLastError(const UwacDisplay *display) {
 }
 
 int UwacCloseDisplay(UwacDisplay *display) {
+	UwacSeat *seat, *tmpSeat;
+	UwacWindow *window, *tmpWindow;
+	UwacOutput *output, *tmpOutput;
+	UwacGlobal *global, *tmpGlobal;
+
 	if (!display)
 		return UWAC_ERROR_INVALID_DISPLAY;
+
+	/* destroy windows */
+	wl_list_for_each_safe(window, tmpWindow, &display->windows, link) {
+		UwacDestroyWindow(window);
+	}
+
+	/* destroy seats */
+	wl_list_for_each_safe(seat, tmpSeat, &display->seats, link) {
+		UwacSeatDestroy(seat);
+	}
+
+	/* destroy output */
+	wl_list_for_each_safe(output, tmpOutput, &display->outputs, link) {
+		UwacDestroyOutput(output);
+	}
+
+	/* destroy globals */
+	wl_list_for_each_safe(global, tmpGlobal, &display->globals, link) {
+		UwacDestroyGlobal(global);
+	}
+
+	if (display->compositor)
+		wl_compositor_destroy(display->compositor);
+	if (display->xdg_shell)
+		xdg_shell_destroy(display->xdg_shell);
+	if (display->shm)
+		wl_shm_destroy(display->shm);
+	if (display->subcompositor)
+		wl_subcompositor_destroy(display->subcompositor);
+	if (display->data_device_manager)
+		wl_data_device_manager_destroy(display->data_device_manager);
 
 	free(display->shm_formats);
 	wl_registry_destroy(display->registry);
@@ -323,6 +344,14 @@ int UwacCloseDisplay(UwacDisplay *display) {
 	close(display->epoll_fd);
 
 	wl_display_disconnect(display->display);
+
+	/* cleanup the event queue */
+	while (display->event_queue) {
+		UwacEventListItem *item = display->event_queue;
+
+		display->event_queue = item->next;
+		free(item);
+	}
 
 	free(display);
 	return 0;
@@ -411,4 +440,47 @@ UwacOutput *UwacDisplayGetOutput(UwacDisplay *display, int index) {
 
 	display->last_error = UWAC_SUCCESS;
 	return container_of(l, UwacOutput, link);
+}
+
+UwacEventListItem *UwacDisplayNewEvent(UwacDisplay *display) {
+	UwacEventListItem *ret;
+
+	if (!display) {
+		display->last_error = UWAC_ERROR_INVALID_DISPLAY;
+		return 0;
+	}
+
+	ret = zalloc(sizeof(UwacEventListItem));
+	if (!ret) {
+		display->last_error = UWAC_ERROR_NOMEMORY;
+		return 0;
+	}
+
+	ret->next = display->event_queue;
+	display->event_queue = ret;
+	return ret;
+}
+
+
+int UwacNextEvent(UwacDisplay *display, UwacEvent *event) {
+	UwacEventListItem *litem;
+	int ret;
+
+	if (!display)
+		return UWAC_ERROR_INVALID_DISPLAY;
+
+	while (!display->event_queue) {
+		ret = UwacDisplayDispatch(display, 1 * 1000);
+		if (ret < 0)
+			return UWAC_ERROR_INTERNAL;
+		else if (ret == 0)
+			return UWAC_ERROR_CLOSED;
+	}
+
+	litem = display->event_queue->next;
+	*event = display->event_queue->event;
+	free(display->event_queue);
+	display->event_queue = litem;
+	return UWAC_SUCCESS;
+
 }

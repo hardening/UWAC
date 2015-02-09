@@ -1,8 +1,8 @@
 AC_PREREQ([2.64])
 
 m4_define([uwac_major_version], [1])
-m4_define([uwac_minor_version], [6])
-m4_define([uwac_micro_version], [90])
+m4_define([uwac_minor_version], [0])
+m4_define([uwac_micro_version], [0])
 m4_define([uwac_version],
           [uwac_major_version.uwac_minor_version.uwac_micro_version])
 
@@ -38,7 +38,7 @@ LT_INIT
 
 AC_CHECK_FUNCS([mkostemp strchrnul initgroups posix_fallocate])
 
-UWAC_MODULES="wayland-client >= 1.5.91"
+UWAC_MODULES="wayland-client >= 1.5.91 pixman-1"
 
 AC_ARG_ENABLE(xkbcommon,
 	      AS_HELP_STRING([--disable-xkbcommon], [Disable libxkbcommon
@@ -54,6 +54,13 @@ if test x$enable_xkbcommon = xyes; then
 fi
 
 PKG_CHECK_MODULES(UWAC, [$UWAC_MODULES])
+
+AC_PATH_PROG([wayland_scanner], [wayland-scanner])
+if test x$wayland_scanner = x; then
+	AC_MSG_ERROR([wayland-scanner is needed to compile weston])
+fi
+
+PKG_CHECK_MODULES(WAYLAND_SCANNER, wayland-scanner)
 
 AC_CONFIG_FILES([
 Makefile
