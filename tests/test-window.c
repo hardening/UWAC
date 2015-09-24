@@ -52,14 +52,14 @@ int main(int argc, char *argv[]) {
 
 	display = UwacOpenDisplay(NULL, &err);
 	if (!display) {
-		fprintf(stderr, "unable to open wayland display: %s", UwacErrorString(err));
+		fprintf(stderr, "unable to open wayland display: %s\n", UwacErrorString(err));
 		return 1;
 	}
 
 
 	window = UwacCreateWindowShm(display, 640, 480, WL_SHM_FORMAT_ARGB8888);
 	if (!window) {
-		fprintf(stderr, "unable to create a window: %s", UwacErrorString(UwacDisplayGetLastError(display)) );
+		fprintf(stderr, "unable to create a window: %s\n", UwacErrorString(UwacDisplayGetLastError(display)) );
 		return 1;
 	}
 

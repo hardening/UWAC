@@ -34,7 +34,7 @@
 #define TARGET_SHM_INTERFACE 1
 #define TARGET_DDM_INTERFACE 1
 #define TARGET_SEAT_INTERFACE 4
-#define TARGET_XDG_VERSION 4 /* The version of xdg-shell that we implement */
+#define TARGET_XDG_VERSION 5 /* The version of xdg-shell that we implement */
 
 
 
