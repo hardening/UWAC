@@ -128,6 +128,7 @@ struct uwac_seat {
 	int32_t repeat_delay_sec, repeat_delay_nsec;
 	uint32_t repeat_sym, repeat_key, repeat_time;
 
+	struct wl_array pressed_keys;
 
 	UwacWindow *pointer_focus;
 	uint32_t pointer_enter_serial;
@@ -179,6 +180,7 @@ UwacSeat *UwacSeatNew(UwacDisplay *d, uint32_t id, uint32_t version);
 void UwacSeatDestroy(UwacSeat *s);
 
 /* in uwac-output.c */
+UwacOutput *UwacCreateOutput(UwacDisplay *d, uint32_t id, uint32_t version);
 int UwacDestroyOutput(UwacOutput *output);
 
 #endif /* __UWAC_PRIV_H_ */

@@ -107,24 +107,101 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
 	input->xkb.shift_mask =	1 << xkb_keymap_mod_get_index(input->xkb.keymap, "Shift");
 }
 
+static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
+		    uint32_t serial, uint32_t time, uint32_t key,
+		    uint32_t state_w);
+
 static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
 		struct wl_surface *surface, struct wl_array *keys)
 {
+	uint32_t *key, *pressedKey;
 	UwacSeat *input = (UwacSeat *)data;
+	int i, found, toMove;
 	UwacMouseEnterLeaveEvent *event = (UwacMouseEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
 
 	event->type = UWAC_EVENT_MOUSE_ENTER;
 	event->window = input->keyboard_focus = (UwacWindow *)wl_surface_get_user_data(surface);
+
+	/* look for keys that have been released */
+	found = false;
+	for (pressedKey = input->pressed_keys.data, i = 0; i < input->pressed_keys.size; i += sizeof(uint32_t)) {
+		wl_array_for_each(key, keys) {
+			if (*key == *pressedKey) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			keyboard_handle_key(data, keyboard, serial, 0, *pressedKey, WL_KEYBOARD_KEY_STATE_RELEASED);
+		} else {
+			pressedKey++;
+		}
+	}
+
+	/* handle keys that are now pressed */
+	wl_array_for_each(key, keys) {
+		keyboard_handle_key(data, keyboard, serial, 0, *key, WL_KEYBOARD_KEY_STATE_PRESSED);
+	}
 }
 
 static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial,
 		struct wl_surface *surface)
 {
-	UwacSeat *input = (UwacSeat *)data;
+	struct itimerspec its;
+	UwacSeat *input;
+
+	input = (UwacSeat *)data;
+
+	its.it_interval.tv_sec = 0;
+	its.it_interval.tv_nsec = 0;
+	its.it_value.tv_sec = 0;
+	its.it_value.tv_nsec = 0;
+	timerfd_settime(input->repeat_timer_fd, 0, &its, NULL);
+
 	UwacMouseEnterLeaveEvent *event = (UwacMouseEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	if (!event) {
+		fprintf(stderr, "%s: unable to allocate a keyboard leave event\n", __FUNCTION__);
+		return;
+	}
 
 	event->type = UWAC_EVENT_MOUSE_LEAVE;
 	event->window = input->keyboard_focus;
+}
+
+static int update_key_pressed(UwacSeat *seat, uint32_t key) {
+	uint32_t *keyPtr;
+
+	/* check if the key is not already pressed */
+	wl_array_for_each(keyPtr, &seat->pressed_keys) {
+		if (*keyPtr == key)
+			return 1;
+	}
+
+	keyPtr = wl_array_add(&seat->pressed_keys, sizeof(uint32_t));
+	if (!keyPtr)
+		return -1;
+
+	*keyPtr = key;
+	return 0;
+}
+
+static int update_key_released(UwacSeat *seat, uint32_t key) {
+	uint32_t *keyPtr;
+	int i, toMove;
+
+	for (i = 0, keyPtr = seat->pressed_keys.data; i < seat->pressed_keys.size; i++, keyPtr++) {
+		if (*keyPtr == key)
+			break;
+	}
+
+	toMove = seat->pressed_keys.size - ((i + 1) * sizeof(uint32_t));
+	if (toMove)
+		memmove(keyPtr, keyPtr+1, toMove);
+
+	seat->pressed_keys.size -= sizeof(uint32_t);
+	return 1;
+
 }
 
 static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
@@ -141,6 +218,11 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
 	xkb_keysym_t sym;
 	struct itimerspec its;
 
+	if (state_w == WL_KEYBOARD_KEY_STATE_PRESSED)
+		update_key_pressed(input, key);
+	else
+		update_key_released(input, key);
+
 	input->display->serial = serial;
 	code = key + 8;
 	if (!window || !input->xkb.state)
@@ -150,7 +232,7 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
 	 * ignore key presses if a grab is active.  We expand the key
 	 * event delivery mechanism to route events to widgets to
 	 * properly handle key grabs.  In the meantime, this prevents
-	 * key event devlivery while a grab is active. */
+	 * key event delivery while a grab is active. */
 	/*if (input->grab && input->grab_button == 0)
 		return;*/
 
@@ -159,24 +241,6 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
 	sym = XKB_KEY_NoSymbol;
 	if (num_syms == 1)
 		sym = syms[0];
-
-#if 0
-	if (sym == XKB_KEY_F5 && input->modifiers == MOD_ALT_MASK) {
-		if (state == WL_KEYBOARD_KEY_STATE_PRESSED)
-			window_set_maximized(window, !window->maximized);
-	} else if (sym == XKB_KEY_F11 &&
-		   window->fullscreen_handler &&
-		   state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		window->fullscreen_handler(window, window->user_data);
-	} else if (sym == XKB_KEY_F4 &&
-		   input->modifiers == MOD_ALT_MASK &&
-		   state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		window_close(window);
-	} else if (window->key_handler) {
-		(*window->key_handler)(window, input, time, key,
-				       sym, state, window->user_data);
-	}
-#endif
 
 	if (state == WL_KEYBOARD_KEY_STATE_RELEASED && key == input->repeat_key) {
 		its.it_interval.tv_sec = 0;
@@ -450,7 +514,6 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 	input->display->serial = serial;
 	input->pointer_enter_serial = serial;
 	input->pointer_focus = window;
-
 	input->sx = sx;
 	input->sy = sy;
 
@@ -653,10 +716,12 @@ UwacSeat *UwacSeatNew(UwacDisplay *d, uint32_t id, uint32_t version) {
 
 	ret = zalloc(sizeof(UwacSeat));
 	ret->display = d;
+
+	wl_array_init(&ret->pressed_keys);
 	ret->xkb_context = xkb_context_new(0);
 	if (!ret->xkb_context) {
 		fprintf(stderr, "%s: unable to allocate a xkb_context\n", __FUNCTION__);
-		goto out_free;
+		goto error_xkb_context;
 	}
 
 	ret->seat = wl_registry_bind(d->registry, id, &wl_seat_interface, version);
@@ -664,20 +729,31 @@ UwacSeat *UwacSeatNew(UwacDisplay *d, uint32_t id, uint32_t version) {
 	wl_seat_set_user_data(ret->seat, ret);
 
 	ret->repeat_timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+	if (ret->repeat_timer_fd < 0) {
+		fprintf(stderr, "%s: error creating repeat timer\n", __FUNCTION__);
+		goto error_timer_fd;
+	}
 	ret->repeat_task.run = keyboard_repeat_func;
-	UwacDisplayWatchFd(d, ret->repeat_timer_fd, EPOLLIN, &ret->repeat_task);
+	if (UwacDisplayWatchFd(d, ret->repeat_timer_fd, EPOLLIN, &ret->repeat_task) < 0) {
+		fprintf(stderr, "%s: error polling repeat timer\n", __FUNCTION__);
+		goto error_watch_timerfd;
+	}
 
 	wl_list_insert(d->seats.prev, &ret->link);
 	return ret;
 
-out_free:
+error_watch_timerfd:
+	close(ret->repeat_timer_fd);
+error_timer_fd:
+	wl_seat_destroy(ret->seat);
+error_xkb_context:
 	free(ret);
 	return NULL;
 }
 
 void UwacSeatDestroy(UwacSeat *s) {
-	if (s->name)
-		free(s->name);
+	free(s->name);
+	wl_array_release(&s->pressed_keys);
 
 	xkb_state_unref(s->xkb.state);
 	xkb_context_unref(s->xkb_context);

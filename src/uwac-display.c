@@ -84,10 +84,43 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		d->shm = wl_registry_bind(registry, id, &wl_shm_interface, min(TARGET_SHM_INTERFACE, version));
 		wl_shm_add_listener(d->shm, &shm_listener, d);
 	} else if (strcmp(interface, "wl_output") == 0) {
-		UwacCreateOutput(d, id, version);
+		UwacOutput *output;
+		UwacOutputNewEvent *ev;
+
+		output = UwacCreateOutput(d, id, version);
+		if (!output) {
+			fprintf(stderr, "%s: unable to create output\n", __FUNCTION__);
+			return;
+		}
+
+		ev = (UwacOutputNewEvent *)UwacDisplayNewEvent(d);
+		if (!ev) {
+			fprintf(stderr, "%s: unable to create new output event\n", __FUNCTION__);
+			return;
+		}
+
+		ev->type = UWAC_EVENT_NEW_OUTPUT;
+		ev->output = output;
+
 		//display_add_output(d, id);
 	} else if (strcmp(interface, "wl_seat") == 0) {
-		UwacSeatNew(d, id, min(version, TARGET_SEAT_INTERFACE));
+		UwacSeatNewEvent *ev;
+		UwacSeat *seat;
+
+		seat = UwacSeatNew(d, id, min(version, TARGET_SEAT_INTERFACE));
+		if (!seat) {
+			fprintf(stderr, "%s: unable to create a new seat\n", __FUNCTION__);
+			return;
+		}
+
+		ev = (UwacSeatNewEvent *)UwacDisplayNewEvent(d);
+		if (!ev) {
+			fprintf(stderr, "%s: unable to create new seat event\n", __FUNCTION__);
+			return;
+		}
+
+		ev->type = UWAC_EVENT_NEW_SEAT;
+		ev->seat = seat;
 	} else if (strcmp(interface, "wl_data_device_manager") == 0) {
 		d->data_device_manager = wl_registry_bind(registry, id, &wl_data_device_manager_interface, min(TARGET_DDM_INTERFACE, version));
 	} else if (strcmp(interface, "xdg_shell") == 0) {

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 David FORT <contact@hardening-consulting.com>
+ * Copyright © 2014-2015 David FORT <contact@hardening-consulting.com>
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -71,6 +71,8 @@ struct uwac_task {
 
 /** @brief */
 enum {
+	UWAC_EVENT_NEW_SEAT,
+	UWAC_EVENT_NEW_OUTPUT,
 	UWAC_EVENT_CONFIGURE,
 	UWAC_EVENT_MOUSE_ENTER,
 	UWAC_EVENT_MOUSE_LEAVE,
@@ -80,6 +82,18 @@ enum {
 	UWAC_EVENT_KEY,
 	UWAC_EVENT_FRAME_DONE
 };
+
+struct uwac_new_output_event {
+	int type;
+	UwacOutput *output;
+};
+typedef struct uwac_new_output_event UwacOutputNewEvent;
+
+struct uwac_new_seat_event {
+	int type;
+	UwacSeat *seat;
+};
+typedef struct uwac_new_seat_event UwacSeatNewEvent;
 
 struct uwac_mouse_enter_event {
 	int type;
@@ -115,6 +129,8 @@ typedef struct uwac_key_event UwacKeyEvent;
 struct uwac_event {
 	union {
 		int type;
+		UwacOutputNewEvent output_new;
+		UwacSeatNewEvent seat_new;
 		UwacMouseEnterLeaveEvent mouse_enter_leave;
 		UwacMouseMotionEvent mouse_motion;
 		UwacFrameDoneEvent frame_done;

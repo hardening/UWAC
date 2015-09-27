@@ -1,3 +1,8 @@
 config.h.in
 aclocal.m4
 autom4te.cache
+Makefile.in
+config.log
+configure
+build-aux/
+m4/
