@@ -81,9 +81,12 @@ int main(int argc, char *argv[]) {
 			time++;
 			break;
 		case UWAC_EVENT_KEY:
-			printf("key sym=0x%x\n", event.key.sym);
-			if ((event.key.sym == XKB_KEY_Escape) && !event.key.pressed)
+			printf("key sym=0x%x pressed=%d\n", event.key.sym, event.key.pressed);
+			if ((event.key.sym == XKB_KEY_Escape) && !event.key.pressed) /* stop when the ESC key is released */
 				doRun = false;
+			break;
+		case UWAC_EVENT_NEW_SEAT:
+			printf("new seat %p\n", event.seat_new.seat);
 			break;
 		default:
 			break;

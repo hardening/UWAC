@@ -28,7 +28,6 @@
 #include <stdbool.h>
 
 typedef struct uwac_size UwacSize;
-typedef struct uwac_task UwacTask;
 typedef struct uwac_display UwacDisplay;
 typedef struct uwac_output UwacOutput;
 typedef struct uwac_window UwacWindow;
@@ -63,22 +62,17 @@ struct uwac_size {
 	int height;
 };
 
-/** @brief */
-struct uwac_task {
-	void (*run)(UwacTask *task, uint32_t events);
-	struct wl_list link;
-};
 
-/** @brief */
+/** @brief event types */
 enum {
 	UWAC_EVENT_NEW_SEAT,
 	UWAC_EVENT_NEW_OUTPUT,
 	UWAC_EVENT_CONFIGURE,
-	UWAC_EVENT_MOUSE_ENTER,
-	UWAC_EVENT_MOUSE_LEAVE,
-	UWAC_EVENT_MOUSE_MOTION,
-	UWAC_EVENT_MOUSE_BUTTONS,
-	UWAC_EVENT_TOUCH,
+	UWAC_EVENT_POINTER_ENTER,
+	UWAC_EVENT_POINTER_LEAVE,
+	UWAC_EVENT_POINTER_MOTION,
+	UWAC_EVENT_POINTER_BUTTONS,
+	UWAC_EVENT_POINTER_AXIS,
 	UWAC_EVENT_KEY,
 	UWAC_EVENT_FRAME_DONE
 };
@@ -95,20 +89,40 @@ struct uwac_new_seat_event {
 };
 typedef struct uwac_new_seat_event UwacSeatNewEvent;
 
-struct uwac_mouse_enter_event {
+struct uwac_pointer_enter_event {
 	int type;
 	UwacWindow *window;
 	UwacSeat *seat;
 };
-typedef struct uwac_mouse_enter_event UwacMouseEnterLeaveEvent;
+typedef struct uwac_pointer_enter_event UwacPointerEnterLeaveEvent;
 
-struct uwac_mouse_motion_event {
+struct uwac_pointer_motion_event {
 	int type;
 	UwacWindow *window;
 	UwacSeat *seat;
 	uint32_t x, y;
 };
-typedef struct uwac_mouse_motion_event UwacMouseMotionEvent;
+typedef struct uwac_pointer_motion_event UwacPointerMotionEvent;
+
+struct uwac_pointer_button_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+	wl_fixed_t x, y;
+	uint32_t button;
+	enum wl_pointer_button_state state;
+};
+typedef struct uwac_pointer_button_event UwacPointerButtonEvent;
+
+struct uwac_pointer_axis_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+	uint32_t x, y;
+	uint32_t axis;
+	wl_fixed_t value;
+};
+typedef struct uwac_pointer_axis_event UwacPointerAxisEvent;
 
 struct uwac_frame_done_event {
 	int type;
@@ -131,8 +145,8 @@ struct uwac_event {
 		int type;
 		UwacOutputNewEvent output_new;
 		UwacSeatNewEvent seat_new;
-		UwacMouseEnterLeaveEvent mouse_enter_leave;
-		UwacMouseMotionEvent mouse_motion;
+		UwacPointerEnterLeaveEvent mouse_enter_leave;
+		UwacPointerMotionEvent mouse_motion;
 		UwacFrameDoneEvent frame_done;
 		UwacKeyEvent key;
 	};
@@ -140,9 +154,17 @@ struct uwac_event {
 };
 typedef struct uwac_event UwacEvent;
 
+typedef bool (*UwacErrorHandler)(UwacDisplay *d, int code, const char *msg, ...);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ *
+ * @param handler
+ */
+void UwacInstallErrorHandler(UwacErrorHandler handler);
 
 
 /**

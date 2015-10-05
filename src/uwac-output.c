@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #define TARGET_OUTPUT_INTERFACE 2
 
@@ -42,10 +43,16 @@ static void output_handle_geometry(void *data, struct wl_output *wl_output, int 
 	if (output->make)
 		free(output->make);
 	output->make = strdup(make);
+	if (!output->make) {
+		assert(uwacErrorHandler(output->display, UWAC_ERROR_NOMEMORY, "%s: unable to strdup make\n", __FUNCTION__));
+	}
 
 	if (output->model)
 		free(output->model);
 	output->model = strdup(model);
+	if (!output->model) {
+		assert(uwacErrorHandler(output->display, UWAC_ERROR_NOMEMORY, "%s: unable to strdup model\n", __FUNCTION__));
+	}
 }
 
 static void output_handle_done(void *data, struct wl_output *wl_output)
@@ -109,10 +116,8 @@ UwacOutput *UwacCreateOutput(UwacDisplay *d, uint32_t id, uint32_t version) {
 }
 
 int UwacDestroyOutput(UwacOutput *output) {
-	if (output->make)
-		free(output->make);
-	if (output->model)
-		free(output->model);
+	free(output->make);
+	free(output->model);
 
 	wl_output_destroy(output->output);
 	wl_list_remove(&output->link);

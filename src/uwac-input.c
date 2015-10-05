@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 David FORT <contact@hardening-consulting.com>
+ * Copyright © 2014-2015 David FORT <contact@hardening-consulting.com>
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -32,7 +32,10 @@
 #include <sys/timerfd.h>
 #include <sys/epoll.h>
 
-
+#define WL_SEAT_SINCE_RELEASE 5
+#define WL_POINTER_SINCE_RELEASE 3
+#define WL_KEYBOARD_SINCE_RELEASE 3
+#define WL_TOUCH_SINCE_RELEASE 3
 
 static void keyboard_repeat_func(UwacTask *task, uint32_t events)
 {
@@ -86,13 +89,13 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
 	close(fd);
 
 	if (!keymap) {
-		fprintf(stderr, "failed to compile keymap\n");
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_INTERNAL, "failed to compile keymap\n"));
 		return;
 	}
 
 	state = xkb_state_new(keymap);
 	if (!state) {
-		fprintf(stderr, "failed to create XKB state\n");
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_NOMEMORY, "failed to create XKB state\n"));
 		xkb_keymap_unref(keymap);
 		return;
 	}
@@ -117,9 +120,14 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard, uint
 	uint32_t *key, *pressedKey;
 	UwacSeat *input = (UwacSeat *)data;
 	int i, found, toMove;
-	UwacMouseEnterLeaveEvent *event = (UwacMouseEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	UwacPointerEnterLeaveEvent *event;
 
-	event->type = UWAC_EVENT_MOUSE_ENTER;
+	event = (UwacPointerEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	if (!event) {
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_INTERNAL, "unable to allocate an enter keyboard event\n"));
+		return;
+	}
+	event->type = UWAC_EVENT_POINTER_ENTER;
 	event->window = input->keyboard_focus = (UwacWindow *)wl_surface_get_user_data(surface);
 
 	/* look for keys that have been released */
@@ -159,13 +167,13 @@ static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard, uint
 	its.it_value.tv_nsec = 0;
 	timerfd_settime(input->repeat_timer_fd, 0, &its, NULL);
 
-	UwacMouseEnterLeaveEvent *event = (UwacMouseEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	UwacPointerEnterLeaveEvent *event = (UwacPointerEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
 	if (!event) {
-		fprintf(stderr, "%s: unable to allocate a keyboard leave event\n", __FUNCTION__);
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a keyboard leave event\n", __FUNCTION__));
 		return;
 	}
 
-	event->type = UWAC_EVENT_MOUSE_LEAVE;
+	event->type = UWAC_EVENT_POINTER_LEAVE;
 	event->window = input->keyboard_focus;
 }
 
@@ -493,8 +501,7 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 {
 	UwacSeat *input = data;
 	UwacWindow *window;
-	UwacEventListItem *litem;
-	UwacMouseEnterLeaveEvent *event;
+	UwacPointerEnterLeaveEvent *event;
 
 	float sx = wl_fixed_to_double(sx_w);
 	float sy = wl_fixed_to_double(sy_w);
@@ -517,11 +524,13 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 	input->sx = sx;
 	input->sy = sy;
 
-	litem = UwacDisplayNewEvent(input->display);
-	assert(litem);
+	event = (UwacPointerEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	if (!event) {
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a mouse enter event\n", __FUNCTION__));
+		return;
+	}
 
-	event = &litem->event.mouse_enter_leave;
-	event->type = UWAC_EVENT_MOUSE_ENTER;
+	event->type = UWAC_EVENT_POINTER_ENTER;
 	event->seat = input;
 	event->window = window;
 }
@@ -529,20 +538,21 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
 		struct wl_surface *surface)
 {
-	UwacEventListItem *litem;
-	UwacMouseEnterLeaveEvent *event;
+	UwacPointerEnterLeaveEvent *event;
 	UwacWindow *window;
 	UwacSeat *input = data;
 
 	input->display->serial = serial;
 
+	event = (UwacPointerEnterLeaveEvent *)UwacDisplayNewEvent(input->display);
+	if (!event) {
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a mouse leave event\n", __FUNCTION__));
+		return;
+	}
+
 	window = wl_surface_get_user_data(surface);
 
-	litem = UwacDisplayNewEvent(input->display);
-	assert(litem);
-
-	event = &litem->event.mouse_enter_leave;
-	event->type = UWAC_EVENT_MOUSE_LEAVE;
+	event->type = UWAC_EVENT_POINTER_LEAVE;
 	event->seat = input;
 	event->window = window;
 
@@ -554,11 +564,10 @@ static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_
 static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32_t time,
 		wl_fixed_t sx_w, wl_fixed_t sy_w)
 {
-	UwacMouseMotionEvent *motion_event;
+	UwacPointerMotionEvent *motion_event;
 	UwacSeat *input = data;
 	UwacWindow *window = input->pointer_focus;
-	//struct widget *widget;
-	int cursor;
+
 	float sx = wl_fixed_to_double(sx_w);
 	float sy = wl_fixed_to_double(sy_w);
 
@@ -568,89 +577,66 @@ static void pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32
 	input->sx = sx;
 	input->sy = sy;
 
-	/* when making the window smaller - e.g. after a unmaximise we might
-	 * still have a pending motion event that the compositor has picked
-	 * based on the old surface dimensions
-	 */
-
-#if 0
-	if (sx > window->main_surface->allocation.width ||
-	    sy > window->main_surface->allocation.height)
+	motion_event = (UwacPointerMotionEvent *)UwacDisplayNewEvent(input->display);
+	if (!motion_event) {
+		assert(uwacErrorHandler(input->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a mouse motion event\n", __FUNCTION__));
 		return;
-
-	if (!(input->grab && input->grab_button)) {
-		widget = window_find_widget(window, sx, sy);
-		input_set_focus_widget(input, widget, sx, sy);
 	}
 
-	if (input->grab)
-		widget = input->grab;
-	else
-		widget = input->focus_widget;
-	if (widget) {
-		if (widget->motion_handler)
-			cursor = widget->motion_handler(input->focus_widget,
-							input, time, sx, sy,
-							widget->user_data);
-		else
-			cursor = widget->default_cursor;
-	} else
-		cursor = CURSOR_LEFT_PTR;
-
-	input_set_pointer_image(input, cursor);
-#endif
-	motion_event = (UwacMouseMotionEvent *)UwacDisplayNewEvent(input->display);
-	assert(motion_event);
-
-	motion_event->type = UWAC_EVENT_MOUSE_MOTION;
+	motion_event->type = UWAC_EVENT_POINTER_MOTION;
 	motion_event->seat = input;
 	motion_event->window = window;
-	motion_event->x = wl_fixed_to_int(sx_w);;
-	motion_event->y = wl_fixed_to_int(sy_w);;
+	motion_event->x = wl_fixed_to_int(sx_w);
+	motion_event->y = wl_fixed_to_int(sy_w);
 }
 
 static void pointer_handle_button(void *data, struct wl_pointer *pointer, uint32_t serial,
 		      uint32_t time, uint32_t button, uint32_t state_w)
 {
-	UwacSeat *input = data;
-	//struct widget *widget;
-	enum wl_pointer_button_state state = state_w;
+	UwacPointerButtonEvent *event;
+	UwacSeat *seat = data;
+	UwacWindow *window = seat->pointer_focus;
 
-	input->display->serial = serial;
-#if 0
-	if (input->focus_widget && input->grab == NULL &&
-	    state == WL_POINTER_BUTTON_STATE_PRESSED)
-		input_grab(input, input->focus_widget, button);
+	seat->display->serial = serial;
 
-	widget = input->grab;
-	if (widget && widget->button_handler)
-		(*widget->button_handler)(widget,
-					  input, time,
-					  button, state,
-					  input->grab->user_data);
+	event = (UwacPointerButtonEvent *)UwacDisplayNewEvent(seat->display);
+	if (!event) {
+		assert(uwacErrorHandler(seat->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a mouse buttons event\n", __FUNCTION__));
+		return;
+	}
 
-	if (input->grab && input->grab_button == button &&
-	    state == WL_POINTER_BUTTON_STATE_RELEASED)
-		input_ungrab(input);
-#endif
+	event->type = UWAC_EVENT_POINTER_BUTTONS;
+	event->seat = seat;
+	event->window = window;
+	event->x = seat->sx;
+	event->y = seat->sy;
+	event->button = button;
+	event->state = (enum wl_pointer_button_state)state_w;
 }
 
 static void pointer_handle_axis(void *data, struct wl_pointer *pointer, uint32_t time,
 		uint32_t axis, wl_fixed_t value)
 {
-	UwacSeat *input = data;
-#if 0
-	struct widget *widget;
+	UwacPointerAxisEvent *event;
+	UwacSeat *seat = data;
+	UwacWindow *window = seat->pointer_focus;
 
-	widget = input->focus_widget;
-	if (input->grab)
-		widget = input->grab;
-	if (widget && widget->axis_handler)
-		(*widget->axis_handler)(widget,
-					input, time,
-					axis, value,
-					widget->user_data);
-#endif
+	if (!window)
+		return;
+
+	event = (UwacPointerAxisEvent *)UwacDisplayNewEvent(seat->display);
+	if (!event) {
+		assert(uwacErrorHandler(seat->display, UWAC_ERROR_NOMEMORY, "%s: unable to allocate a pointer axis event\n", __FUNCTION__));
+		return;
+	}
+
+	event->type = UWAC_EVENT_POINTER_AXIS;
+	event->seat = seat;
+	event->window = window;
+	event->x = seat->sx;
+	event->y = seat->sy;
+	event->axis = axis;
+	event->value = value;
 }
 
 static const struct wl_pointer_listener pointer_listener = {
@@ -672,6 +658,8 @@ static void seat_handle_capabilities(void *data, struct wl_seat *seat, enum wl_s
 		wl_pointer_set_user_data(input->pointer, input);
 		wl_pointer_add_listener(input->pointer, &pointer_listener, input);
 	} else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && input->pointer) {
+		if (input->seat_version >= WL_POINTER_SINCE_RELEASE)
+			wl_pointer_release(input->pointer);
 		wl_pointer_destroy(input->pointer);
 		input->pointer = NULL;
 	}
@@ -681,6 +669,8 @@ static void seat_handle_capabilities(void *data, struct wl_seat *seat, enum wl_s
 		wl_keyboard_set_user_data(input->keyboard, input);
 		wl_keyboard_add_listener(input->keyboard, &keyboard_listener, input);
 	} else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && input->keyboard) {
+		if (input->seat_version >= WL_KEYBOARD_SINCE_RELEASE)
+			wl_keyboard_release(input->keyboard);
 		wl_keyboard_destroy(input->keyboard);
 		input->keyboard = NULL;
 	}
@@ -690,6 +680,8 @@ static void seat_handle_capabilities(void *data, struct wl_seat *seat, enum wl_s
 		wl_touch_set_user_data(input->touch, input);
 		wl_touch_add_listener(input->touch, &touch_listener, input);
 	} else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && input->touch) {
+		if (input->seat_version >= WL_TOUCH_SINCE_RELEASE)
+			wl_touch_release(input->touch);
 		wl_touch_destroy(input->touch);
 		input->touch = NULL;
 	}
@@ -707,7 +699,7 @@ seat_handle_name(void *data, struct wl_seat *seat, const char *name)
 
 static const struct wl_seat_listener seat_listener = {
 	seat_handle_capabilities,
-	seat_handle_name
+	seat_handle_name,
 };
 
 
@@ -716,6 +708,8 @@ UwacSeat *UwacSeatNew(UwacDisplay *d, uint32_t id, uint32_t version) {
 
 	ret = zalloc(sizeof(UwacSeat));
 	ret->display = d;
+	ret->seat_id = id;
+	ret->seat_version = version;
 
 	wl_array_init(&ret->pressed_keys);
 	ret->xkb_context = xkb_context_new(0);
@@ -752,6 +746,9 @@ error_xkb_context:
 }
 
 void UwacSeatDestroy(UwacSeat *s) {
+	if (s->seat && (s->seat_version >= WL_SEAT_SINCE_RELEASE))
+		wl_seat_release(s->seat);
+
 	free(s->name);
 	wl_array_release(&s->pressed_keys);
 
@@ -766,6 +763,7 @@ void UwacSeatDestroy(UwacSeat *s) {
 		wl_keyboard_destroy(s->keyboard);
 
 	wl_seat_destroy(s->seat);
+	s->seat = NULL;
 
 	wl_list_remove(&s->link);
 	free(s);

@@ -26,6 +26,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+#include <assert.h>
 #include <errno.h>
 #include <time.h>
 #include <sys/epoll.h>
@@ -33,9 +35,26 @@
 #define TARGET_COMPOSITOR_INTERFACE 3
 #define TARGET_SHM_INTERFACE 1
 #define TARGET_DDM_INTERFACE 1
-#define TARGET_SEAT_INTERFACE 4
+#define TARGET_SEAT_INTERFACE 5
 #define TARGET_XDG_VERSION 5 /* The version of xdg-shell that we implement */
 
+
+bool uwac_default_error_handler(UwacDisplay *display, int code, const char *msg, ...) {
+	va_list args;
+	va_start(args, msg);
+
+	vfprintf(stderr, "%s", args);
+	return false;
+}
+
+UwacErrorHandler uwacErrorHandler = uwac_default_error_handler;
+
+void UwacInstallErrorHandler(UwacErrorHandler handler) {
+	if (handler)
+		uwacErrorHandler = handler;
+	else
+		uwacErrorHandler = uwac_default_error_handler;
+}
 
 
 static void cb_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
@@ -64,7 +83,17 @@ static const struct xdg_shell_listener xdg_shell_listener = {
 	xdg_shell_ping,
 };
 
+static void display_destroy_seat(UwacDisplay *d, uint32_t name)
+{
+	UwacSeat *seat;
 
+	wl_list_for_each(seat, &d->seats, link) {
+		if (seat->seat_id == name) {
+			UwacSeatDestroy(seat);
+			break;
+		}
+	}
+}
 
 static void registry_handle_global(void *data, struct wl_registry *registry, uint32_t id,
 		       const char *interface, uint32_t version)
@@ -89,13 +118,13 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 
 		output = UwacCreateOutput(d, id, version);
 		if (!output) {
-			fprintf(stderr, "%s: unable to create output\n", __FUNCTION__);
+			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create output\n"));
 			return;
 		}
 
 		ev = (UwacOutputNewEvent *)UwacDisplayNewEvent(d);
 		if (!ev) {
-			fprintf(stderr, "%s: unable to create new output event\n", __FUNCTION__);
+			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create new output event\n"));
 			return;
 		}
 
@@ -109,13 +138,13 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 
 		seat = UwacSeatNew(d, id, min(version, TARGET_SEAT_INTERFACE));
 		if (!seat) {
-			fprintf(stderr, "%s: unable to create a new seat\n", __FUNCTION__);
+			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create new seat\n"));
 			return;
 		}
 
 		ev = (UwacSeatNewEvent *)UwacDisplayNewEvent(d);
 		if (!ev) {
-			fprintf(stderr, "%s: unable to create new seat event\n", __FUNCTION__);
+			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create new seat event\n"));
 			return;
 		}
 
@@ -130,11 +159,11 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 #if 0
 	} else if (strcmp(interface, "text_cursor_position") == 0) {
 		d->text_cursor_position = wl_registry_bind(registry, id, &text_cursor_position_interface, 1);
-#endif
 	} else if (strcmp(interface, "workspace_manager") == 0) {
 		//init_workspace_manager(d, id);
 	} else if (strcmp(interface, "wl_subcompositor") == 0) {
 		d->subcompositor = wl_registry_bind(registry, id, &wl_subcompositor_interface, 1);
+#endif
 	}
 
 #if 0
@@ -156,6 +185,9 @@ static void registry_handle_global_remove(void *data, struct wl_registry *regist
 		if (strcmp(global->interface, "wl_output") == 0)
 			display_destroy_output(d, name);
 #endif
+
+		if (strcmp(global->interface, "wl_seat") == 0)
+			display_destroy_seat(d, name);
 
 		/* XXX: Should destroy remaining bound globals */
 
@@ -270,13 +302,14 @@ UwacDisplay *UwacOpenDisplay(const char *name, int *err) {
 	wl_registry_add_listener(ret->registry, &registry_listener, ret);
 
 	if ((wl_display_roundtrip(ret->display) < 0) || (wl_display_roundtrip(ret->display) < 0)) {
-		fprintf(stderr, "Failed to process Wayland connection: %m\n");
+		uwacErrorHandler(ret, UWAC_ERROR_UNABLE_TO_CONNECT, "Failed to process Wayland connection: %m\n");
 		*err = UWAC_ERROR_UNABLE_TO_CONNECT;
 		goto out_free_registry;
 	}
 
 	ret->dispatch_fd_task.run = display_dispatch_events;
 	if (UwacDisplayWatchFd(ret, ret->display_fd, EPOLLIN | EPOLLERR | EPOLLHUP, &ret->dispatch_fd_task) < 0) {
+		uwacErrorHandler(ret, UWAC_ERROR_INTERNAL, "unable to watch display fd: %m\n");
 		*err = UWAC_ERROR_INTERNAL;
 		goto out_free_registry;
 	}
@@ -379,10 +412,10 @@ int UwacCloseDisplay(UwacDisplay *display) {
 	wl_display_disconnect(display->display);
 
 	/* cleanup the event queue */
-	while (display->event_queue) {
-		UwacEventListItem *item = display->event_queue;
+	while (display->push_queue) {
+		UwacEventListItem *item = display->push_queue;
 
-		display->event_queue = item->next;
+		display->push_queue = item->tail;
 		free(item);
 	}
 
@@ -475,7 +508,7 @@ UwacOutput *UwacDisplayGetOutput(UwacDisplay *display, int index) {
 	return container_of(l, UwacOutput, link);
 }
 
-UwacEventListItem *UwacDisplayNewEvent(UwacDisplay *display) {
+UwacEvent *UwacDisplayNewEvent(UwacDisplay *display) {
 	UwacEventListItem *ret;
 
 	if (!display) {
@@ -489,20 +522,24 @@ UwacEventListItem *UwacDisplayNewEvent(UwacDisplay *display) {
 		return 0;
 	}
 
-	ret->next = display->event_queue;
-	display->event_queue = ret;
-	return ret;
+	ret->tail = display->push_queue;
+	if (ret->tail)
+		ret->tail->head = ret;
+	else
+		display->pop_queue = ret;
+	display->push_queue = ret;
+	return &ret->event;
 }
 
 
 int UwacNextEvent(UwacDisplay *display, UwacEvent *event) {
-	UwacEventListItem *litem;
+	UwacEventListItem *prevItem;
 	int ret;
 
 	if (!display)
 		return UWAC_ERROR_INVALID_DISPLAY;
 
-	while (!display->event_queue) {
+	while (!display->pop_queue) {
 		ret = UwacDisplayDispatch(display, 1 * 1000);
 		if (ret < 0)
 			return UWAC_ERROR_INTERNAL;
@@ -510,10 +547,13 @@ int UwacNextEvent(UwacDisplay *display, UwacEvent *event) {
 			return UWAC_ERROR_CLOSED;
 	}
 
-	litem = display->event_queue->next;
-	*event = display->event_queue->event;
-	free(display->event_queue);
-	display->event_queue = litem;
+	prevItem = display->pop_queue->head;
+	*event = display->pop_queue->event;
+	free(display->pop_queue);
+	display->pop_queue = prevItem;
+	if (prevItem)
+		prevItem->tail = NULL;
+	else
+		display->push_queue = NULL;
 	return UWAC_SUCCESS;
-
 }

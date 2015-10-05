@@ -30,6 +30,17 @@
 
 #include "uwac.h"
 
+
+extern UwacErrorHandler uwacErrorHandler;
+
+typedef struct uwac_task UwacTask;
+
+/** @brief */
+struct uwac_task {
+	void (*run)(UwacTask *task, uint32_t events);
+	struct wl_list link;
+};
+
 /** @brief a global registry object */
 struct uwac_global {
 	uint32_t name;
@@ -42,11 +53,11 @@ typedef struct uwac_global UwacGlobal;
 struct uwac_event_list_item;
 typedef struct uwac_event_list_item UwacEventListItem;
 
+/** @brief */
 struct uwac_event_list_item {
 	UwacEvent event;
-	UwacEventListItem *next;
+	UwacEventListItem *tail, *head;
 };
-
 
 
 /** @brief main connection object to a wayland display */
@@ -85,7 +96,7 @@ struct uwac_display {
 
 	struct wl_list outputs;
 
-	UwacEventListItem *event_queue;
+	UwacEventListItem *push_queue, *pop_queue;
 };
 
 /** @brief an output on a wayland display */
@@ -111,6 +122,8 @@ struct uwac_seat {
 	UwacDisplay *display;
 	char *name;
 	struct wl_seat *seat;
+	uint32_t seat_id;
+	uint32_t seat_version;
 	struct wl_pointer *pointer;
 	struct wl_keyboard *keyboard;
 	struct wl_touch *touch;
@@ -141,30 +154,28 @@ struct uwac_seat {
 	struct wl_list link;
 };
 
-#define UWAC_N_BUFFERING 3
 
 /** @brief a buffer used for drawing a surface frame */
 struct uwac_buffer {
+	bool used;
 	pixman_region32_t damage;
 	struct wl_buffer *wayland_buffer;
 	void *data;
 };
 typedef struct uwac_buffer UwacBuffer;
 
+
 /** @brief a window */
 struct uwac_window {
-	UwacDisplay *diplay;
+	UwacDisplay *display;
 	int width, height, stride;
+	enum wl_shm_format format;
 
-	struct {
-		int fd;
-		char *shm_data;
-		struct wl_shm_pool *shm_pool;
-	} shm;
+	int nbuffers;
+	UwacBuffer *buffers;
 
-	UwacBuffer buffers[3];
 	struct wl_callback *frame_callback;
-	int drawingBuffer, pendingBuffer, submittedBuffer;
+	UwacBuffer *drawingBuffer, *pendingBuffer;
 	struct wl_surface *surface;
 	struct xdg_surface *xdg_surface;
 	struct wl_list link;
@@ -172,7 +183,7 @@ struct uwac_window {
 
 
 /* in uwa-display.c */
-UwacEventListItem *UwacDisplayNewEvent(UwacDisplay *d);
+UwacEvent *UwacDisplayNewEvent(UwacDisplay *d);
 
 
 /* in uwac-input.c */
