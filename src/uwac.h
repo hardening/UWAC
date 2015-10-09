@@ -65,7 +65,8 @@ struct uwac_size {
 
 /** @brief event types */
 enum {
-	UWAC_EVENT_NEW_SEAT,
+	UWAC_EVENT_NEW_SEAT = 0,
+	UWAC_EVENT_REMOVED_SEAT,
 	UWAC_EVENT_NEW_OUTPUT,
 	UWAC_EVENT_CONFIGURE,
 	UWAC_EVENT_POINTER_ENTER,
@@ -74,6 +75,12 @@ enum {
 	UWAC_EVENT_POINTER_BUTTONS,
 	UWAC_EVENT_POINTER_AXIS,
 	UWAC_EVENT_KEY,
+	UWAC_EVENT_TOUCH_FRAME_BEGIN,
+	UWAC_EVENT_TOUCH_UP,
+	UWAC_EVENT_TOUCH_DOWN,
+	UWAC_EVENT_TOUCH_MOTION,
+	UWAC_EVENT_TOUCH_CANCEL,
+	UWAC_EVENT_TOUCH_FRAME_END,
 	UWAC_EVENT_FRAME_DONE
 };
 
@@ -88,6 +95,8 @@ struct uwac_new_seat_event {
 	UwacSeat *seat;
 };
 typedef struct uwac_new_seat_event UwacSeatNewEvent;
+
+typedef struct uwac_new_seat_event UwacSeatRemovedEvent;
 
 struct uwac_pointer_enter_event {
 	int type;
@@ -123,6 +132,27 @@ struct uwac_pointer_axis_event {
 	wl_fixed_t value;
 };
 typedef struct uwac_pointer_axis_event UwacPointerAxisEvent;
+
+struct uwac_touch_frame_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+};
+typedef struct uwac_touch_frame_event UwacTouchFrameBegin;
+typedef struct uwac_touch_frame_event UwacTouchFrameEnd;
+typedef struct uwac_touch_frame_event UwacTouchCancel;
+
+struct uwac_touch_data {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+	int32_t id;
+	wl_fixed_t x_w;
+	wl_fixed_t y_w;
+};
+typedef struct uwac_touch_data UwacTouchUp;
+typedef struct uwac_touch_data UwacTouchDown;
+typedef struct uwac_touch_data UwacTouchMotion;
 
 struct uwac_frame_done_event {
 	int type;
@@ -306,6 +336,12 @@ int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame);
  */
 int UwacNextEvent(UwacDisplay *display, UwacEvent *event);
 
+
+/**
+ * @param seat
+ * @return the name of the seat
+ */
+const char *UwacSeatGetName(const UwacSeat *seat);
 
 #ifdef __cplusplus
 }

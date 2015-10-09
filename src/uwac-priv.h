@@ -147,7 +147,10 @@ struct uwac_seat {
 	uint32_t pointer_enter_serial;
 
 	UwacWindow *keyboard_focus;
+
 	UwacWindow *touch_focus;
+	bool touch_frame_started;
+
 	int repeat_timer_fd;
 	UwacTask repeat_task;
 	float sx, sy;
@@ -183,7 +186,7 @@ struct uwac_window {
 
 
 /* in uwa-display.c */
-UwacEvent *UwacDisplayNewEvent(UwacDisplay *d);
+UwacEvent *UwacDisplayNewEvent(UwacDisplay *d, int type);
 
 
 /* in uwac-input.c */

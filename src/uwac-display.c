@@ -38,6 +38,26 @@
 #define TARGET_SEAT_INTERFACE 5
 #define TARGET_XDG_VERSION 5 /* The version of xdg-shell that we implement */
 
+static const char *event_names[] = {
+	"new seat",
+	"removed seat",
+	"new output",
+	"configure",
+	"pointer enter",
+	"pointer leave",
+	"pointer motion",
+	"pointer buttons",
+	"pointer axis",
+	"key",
+	"touch frame begin",
+	"touch up",
+	"touch down",
+	"touch motion",
+	"touch cancel",
+	"touch frame end",
+	"frame done",
+	NULL
+};
 
 bool uwac_default_error_handler(UwacDisplay *display, int code, const char *msg, ...) {
 	va_list args;
@@ -83,16 +103,18 @@ static const struct xdg_shell_listener xdg_shell_listener = {
 	xdg_shell_ping,
 };
 
-static void display_destroy_seat(UwacDisplay *d, uint32_t name)
+static UwacSeat *display_destroy_seat(UwacDisplay *d, uint32_t name)
 {
 	UwacSeat *seat;
 
 	wl_list_for_each(seat, &d->seats, link) {
 		if (seat->seat_id == name) {
 			UwacSeatDestroy(seat);
-			break;
+			return seat;
 		}
 	}
+
+	return NULL;
 }
 
 static void registry_handle_global(void *data, struct wl_registry *registry, uint32_t id,
@@ -122,14 +144,9 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 			return;
 		}
 
-		ev = (UwacOutputNewEvent *)UwacDisplayNewEvent(d);
-		if (!ev) {
-			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create new output event\n"));
-			return;
-		}
-
-		ev->type = UWAC_EVENT_NEW_OUTPUT;
-		ev->output = output;
+		ev = (UwacOutputNewEvent *)UwacDisplayNewEvent(d, UWAC_EVENT_NEW_OUTPUT);
+		if (ev)
+			ev->output = output;
 
 		//display_add_output(d, id);
 	} else if (strcmp(interface, "wl_seat") == 0) {
@@ -142,13 +159,12 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 			return;
 		}
 
-		ev = (UwacSeatNewEvent *)UwacDisplayNewEvent(d);
+		ev = (UwacSeatNewEvent *)UwacDisplayNewEvent(d, UWAC_EVENT_NEW_SEAT);
 		if (!ev) {
 			assert(uwacErrorHandler(d, UWAC_ERROR_NOMEMORY, "unable to create new seat event\n"));
 			return;
 		}
 
-		ev->type = UWAC_EVENT_NEW_SEAT;
 		ev->seat = seat;
 	} else if (strcmp(interface, "wl_data_device_manager") == 0) {
 		d->data_device_manager = wl_registry_bind(registry, id, &wl_data_device_manager_interface, min(TARGET_DDM_INTERFACE, version));
@@ -165,11 +181,6 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		d->subcompositor = wl_registry_bind(registry, id, &wl_subcompositor_interface, 1);
 #endif
 	}
-
-#if 0
-	if (d->global_handler)
-		d->global_handler(d, id, interface, version, d->user_data);
-#endif
 }
 
 static void registry_handle_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
@@ -186,15 +197,16 @@ static void registry_handle_global_remove(void *data, struct wl_registry *regist
 			display_destroy_output(d, name);
 #endif
 
-		if (strcmp(global->interface, "wl_seat") == 0)
-			display_destroy_seat(d, name);
+		if (strcmp(global->interface, "wl_seat") == 0) {
+			UwacSeatRemovedEvent *ev;
+			UwacSeat *seat;
 
-		/* XXX: Should destroy remaining bound globals */
+			seat = display_destroy_seat(d, name);
+			ev = (UwacSeatRemovedEvent *)UwacDisplayNewEvent(d, UWAC_EVENT_REMOVED_SEAT);
+			if (ev)
+				ev->seat = seat;
+		}
 
-#if 0
-		if (d->global_handler_remove)
-			d->global_handler_remove(d, name, global->interface, global->version, d->user_data);
-#endif
 
 		wl_list_remove(&global->link);
 		free(global->interface);
@@ -508,7 +520,7 @@ UwacOutput *UwacDisplayGetOutput(UwacDisplay *display, int index) {
 	return container_of(l, UwacOutput, link);
 }
 
-UwacEvent *UwacDisplayNewEvent(UwacDisplay *display) {
+UwacEvent *UwacDisplayNewEvent(UwacDisplay *display, int type) {
 	UwacEventListItem *ret;
 
 	if (!display) {
@@ -518,10 +530,12 @@ UwacEvent *UwacDisplayNewEvent(UwacDisplay *display) {
 
 	ret = zalloc(sizeof(UwacEventListItem));
 	if (!ret) {
+		assert(uwacErrorHandler(display, UWAC_ERROR_NOMEMORY, "unable to allocate a '%s' event", event_names[type]));
 		display->last_error = UWAC_ERROR_NOMEMORY;
 		return 0;
 	}
 
+	ret->event.type = type;
 	ret->tail = display->push_queue;
 	if (ret->tail)
 		ret->tail->head = ret;

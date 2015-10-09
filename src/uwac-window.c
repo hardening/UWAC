@@ -254,11 +254,12 @@ static void UwacSubmitBufferPtr(UwacWindow *window, UwacBuffer *buffer) {
 
 static void frame_done_cb(void *data, struct wl_callback *callback, uint32_t time) {
 	UwacWindow *window = (UwacWindow *)data;
+	UwacFrameDoneEvent *event;
 
 	window->pendingBuffer = NULL;
-	UwacFrameDoneEvent *event = (UwacFrameDoneEvent *)UwacDisplayNewEvent(window->display);
-	event->type = UWAC_EVENT_FRAME_DONE;
-	event->window = window;
+	event = (UwacFrameDoneEvent *)UwacDisplayNewEvent(window->display, UWAC_EVENT_FRAME_DONE);
+	if(event)
+		event->window = window;
 }
 
 

@@ -88,6 +88,9 @@ int main(int argc, char *argv[]) {
 		case UWAC_EVENT_NEW_SEAT:
 			printf("new seat %p\n", event.seat_new.seat);
 			break;
+		case UWAC_EVENT_REMOVED_SEAT:
+			printf("removed seat %p\n", event.seat_new.seat);
+			break;
 		default:
 			break;
 		}
