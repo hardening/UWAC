@@ -6,3 +6,4 @@ config.log
 configure
 build-aux/
 m4/
+output/

@@ -32,14 +32,6 @@
 #include <sys/timerfd.h>
 #include <sys/epoll.h>
 
-#ifndef WL_POINTER_RELEASE_SINCE
-
-#define WL_SEAT_RELEASE_SINCE_VERSION 5
-#define WL_POINTER_RELEASE_SINCE_VERSION 3
-#define WL_KEYBOARD_RELEASE_SINCE_VERSION 3
-#define WL_TOUCH_RELEASE_SINCE_VERSION 3
-
-#endif /* WL_POINTER_RELEASE_SINCE */
 
 static void keyboard_repeat_func(UwacTask *task, uint32_t events)
 {
@@ -371,13 +363,13 @@ static void touch_handle_down(void *data, struct wl_touch *wl_touch,
 
 	tdata->seat = seat;
 	tdata->id = id;
-	tdata->x_w = x_w;
-	tdata->y_w = y_w;
+	tdata->x = x_w;
+	tdata->y = y_w;
 
 #if 0
 	struct widget *widget;
-	float sx = wl_fixed_to_double(x_w);
-	float sy = wl_fixed_to_double(y_w);
+	float sx = wl_fixed_to_double(x);
+	float sy = wl_fixed_to_double(y);
 
 
 	input->touch_focus = wl_surface_get_user_data(surface);
@@ -396,8 +388,8 @@ static void touch_handle_down(void *data, struct wl_touch *wl_touch,
 		widget = input->grab;
 	else
 		widget = window_find_widget(input->touch_focus,
-					    wl_fixed_to_double(x_w),
-					    wl_fixed_to_double(y_w));
+					    wl_fixed_to_double(x),
+					    wl_fixed_to_double(y));
 	if (widget) {
 		struct touch_point *tp = xmalloc(sizeof *tp);
 		if (tp) {
@@ -474,13 +466,13 @@ static void touch_handle_motion(void *data, struct wl_touch *wl_touch,
 
 	tdata->seat = seat;
 	tdata->id = id;
-	tdata->x_w = x_w;
-	tdata->y_w = y_w;
+	tdata->x = x_w;
+	tdata->y = y_w;
 
 #if 0
 	struct touch_point *tp;
-	float sx = wl_fixed_to_double(x_w);
-	float sy = wl_fixed_to_double(y_w);
+	float sx = wl_fixed_to_double(x);
+	float sy = wl_fixed_to_double(y);
 
 	DBG("touch_handle_motion: %i %i\n", id, wl_list_length(&seat->touch_point_list));
 
@@ -575,14 +567,15 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 	}
 
 
-	window = wl_surface_get_user_data(surface);
 /*	if (surface != window->main_surface->surface) {
 		DBG("Ignoring input event from subsurface %p\n", surface);
 		return;
 	}*/
 
 	input->display->serial = serial;
-	input->pointer_enter_serial = serial;
+	window = wl_surface_get_user_data(surface);
+	if (window)
+		window->pointer_enter_serial = serial;
 	input->pointer_focus = window;
 	input->sx = sx;
 	input->sy = sy;

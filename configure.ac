@@ -64,5 +64,6 @@ PKG_CHECK_MODULES(WAYLAND_SCANNER, wayland-scanner)
 
 AC_CONFIG_FILES([
 Makefile
+uwac.pc
 ])
 AC_OUTPUT

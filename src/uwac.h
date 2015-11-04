@@ -147,8 +147,8 @@ struct uwac_touch_data {
 	UwacWindow *window;
 	UwacSeat *seat;
 	int32_t id;
-	wl_fixed_t x_w;
-	wl_fixed_t y_w;
+	wl_fixed_t x;
+	wl_fixed_t y;
 };
 typedef struct uwac_touch_data UwacTouchUp;
 typedef struct uwac_touch_data UwacTouchDown;
@@ -177,8 +177,14 @@ struct uwac_event {
 		UwacSeatNewEvent seat_new;
 		UwacPointerEnterLeaveEvent mouse_enter_leave;
 		UwacPointerMotionEvent mouse_motion;
-		UwacFrameDoneEvent frame_done;
 		UwacKeyEvent key;
+		UwacTouchFrameBegin touchFrameBegin;
+		UwacTouchUp touchUp;
+		UwacTouchDown touchDown;
+		UwacTouchMotion touchMotion;
+		UwacTouchFrameEnd touchFrameEnd;
+		UwacTouchCancel touchCancel;
+		UwacFrameDoneEvent frame_done;
 	};
 
 };

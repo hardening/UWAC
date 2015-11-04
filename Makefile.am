@@ -18,7 +18,8 @@ libuwac_la_SOURCES = \
 	src/uwac-display.c \
 	src/uwac-input.c \
 	src/uwac-output.c \
-	src/uwac-window.c
+	src/uwac-window.c \
+	src/uwac-tools.c
 libuwac_la_LIBADD = $(UWAC_LIBS) 
 	 
 nodist_libuwac_la_SOURCES =					\
@@ -27,7 +28,8 @@ nodist_libuwac_la_SOURCES =					\
 
 BUILT_SOURCES += $(nodist_libuwac_la_SOURCES)
 
-
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = uwac.pc
 
 noinst_PROGRAMS = test_basic test_window
 
@@ -36,6 +38,8 @@ test_basic_LDADD = libuwac.la $(UWAC_LIBS)
 
 test_window_SOURCES = tests/test-window.c
 test_window_LDADD = libuwac.la $(UWAC_LIBS)
+
+
 
 
 

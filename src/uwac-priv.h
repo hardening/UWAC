@@ -144,7 +144,6 @@ struct uwac_seat {
 	struct wl_array pressed_keys;
 
 	UwacWindow *pointer_focus;
-	uint32_t pointer_enter_serial;
 
 	UwacWindow *keyboard_focus;
 
@@ -182,6 +181,10 @@ struct uwac_window {
 	struct wl_surface *surface;
 	struct xdg_surface *xdg_surface;
 	struct wl_list link;
+
+	uint32_t pointer_enter_serial;
+	uint32_t pointer_cursor_serial;
+	int pointer_current_cursor;
 };
 
 
