@@ -31,6 +31,18 @@ nodist_libuwac_la_SOURCES =					\
 	protocol/xdg-shell-protocol.c		\
 	protocol/xdg-shell-client-protocol.h
 
+if BUILD_IVI
+nodist_libuwac_la_SOURCES += \
+		protocol/ivi-application-protocol.c \
+		protocol/ivi-application-client-protocol.h
+endif
+
+if BUILD_FULLSCREEN_SHELL
+nodist_libuwac_la_SOURCES += \
+		protocol/fullscreen-shell-protocol.c \
+		protocol/fullscreen-shell-client-protocol.h
+endif
+
 BUILT_SOURCES += $(nodist_libuwac_la_SOURCES)
 
 pkgconfigdir = $(libdir)/pkgconfig

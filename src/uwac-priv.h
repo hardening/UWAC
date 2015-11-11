@@ -23,8 +23,17 @@
 #ifndef __UWAC_PRIV_H_
 #define __UWAC_PRIV_H_
 
+#include "config.h"
+
 #include <stdbool.h>
 #include <wayland-client.h>
+#include "xdg-shell-client-protocol.h"
+#ifdef BUILD_IVI
+#include "ivi-application-client-protocol.h"
+#endif
+#ifdef BUILD_FULLSCREEN_SHELL
+#include "fullscreen-shell-client-protocol.h"
+#endif
 #include <pixman-1/pixman.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -69,6 +78,12 @@ struct uwac_display {
 	struct wl_compositor *compositor;
 	struct wl_subcompositor *subcompositor;
 	struct xdg_shell *xdg_shell;
+#ifdef BUILD_IVI
+	struct ivi_application *ivi_application;
+#endif
+#ifdef BUILD_FULLSCREEN_SHELL
+	struct _wl_fullscreen_shell *fullscreen_shell;
+#endif
 
 	struct wl_shm *shm;
 	enum wl_shm_format *shm_formats;
@@ -181,6 +196,9 @@ struct uwac_window {
 	UwacBuffer *drawingBuffer, *pendingBuffer;
 	struct wl_surface *surface;
 	struct xdg_surface *xdg_surface;
+#ifdef BUILD_IVI
+	struct ivi_surface *ivi_surface;
+#endif
 	struct wl_list link;
 
 	uint32_t pointer_enter_serial;

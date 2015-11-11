@@ -62,6 +62,22 @@ fi
 
 PKG_CHECK_MODULES(WAYLAND_SCANNER, wayland-scanner)
 
+AC_ARG_ENABLE(ivi,
+	      AS_HELP_STRING([--disable-ivi], [Disable IVI shell]),,
+	      enable_ivi=yes)
+if test x$enable_ivi = xyes; then
+	AC_DEFINE(BUILD_IVI, [1], [Build UWAC with IVI shell support])
+fi
+AM_CONDITIONAL(BUILD_IVI, test x$enable_ivi = xyes)
+
+AC_ARG_ENABLE(fullscreen,
+	      AS_HELP_STRING([--disable-fullscreen], [Disable fullscreen shell]),,
+	      enable_fullscreen=yes)
+if test x$enable_fullscreen = xyes; then
+	AC_DEFINE(BUILD_FULLSCREEN_SHELL, [1], [Build UWAC with fullscreen shell support])
+fi
+AM_CONDITIONAL(BUILD_FULLSCREEN_SHELL, test x$enable_fullscreen = xyes)
+
 AC_CONFIG_FILES([
 Makefile
 uwac.pc

@@ -19,6 +19,7 @@ by the compositor;
 most application may don't care);
 * an event system that looks like the X11 one. With extra bonus that you will be notified when it's a good idea to 
 update graphical content for a frame;
+* supports for XDG, fullscreen and IVI shells;
 
 # Dependencies
 
@@ -27,5 +28,14 @@ I have tried to minimize the libraries required to compile UWAC, today the depen
 * wayland client
 * pixman
 * XKB common
+
+# TODO
+
+UWAC lacks a lot of things:
+
+* no Client Side Decoration (CSD), so you can not really interact with the window
+itself: no way to resize with the mouse, to close. And of course, without CSD the
+window looks ugly;
+* no mouse pointer support: this is planned but requires quite a lot of work;
 
 

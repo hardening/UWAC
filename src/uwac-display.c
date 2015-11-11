@@ -103,6 +103,18 @@ static const struct xdg_shell_listener xdg_shell_listener = {
 	xdg_shell_ping,
 };
 
+#ifdef BUILD_FULLSCREEN_SHELL
+static void fullscreen_capability(void *data, struct _wl_fullscreen_shell *_wl_fullscreen_shell,
+			   uint32_t capabilty)
+{
+}
+
+static const struct _wl_fullscreen_shell_listener fullscreen_shell_listener = {
+		fullscreen_capability,
+};
+#endif
+
+
 static UwacSeat *display_destroy_seat(UwacDisplay *d, uint32_t name)
 {
 	UwacSeat *seat;
@@ -172,6 +184,15 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		d->xdg_shell = wl_registry_bind(registry, id, &xdg_shell_interface, 1);
 		xdg_shell_use_unstable_version(d->xdg_shell, TARGET_XDG_VERSION);
 		xdg_shell_add_listener(d->xdg_shell, &xdg_shell_listener, d);
+#if BUILD_IVI
+	} else if (strcmp(interface, "ivi_application") == 0) {
+		d->ivi_application = wl_registry_bind(registry, id, &ivi_application_interface, 1);
+#endif
+#if BUILD_FULLSCREEN_SHELL
+	} else if (strcmp(interface, "_wl_fullscreen_shell") == 0) {
+		d->fullscreen_shell = wl_registry_bind(registry, id, &_wl_fullscreen_shell_interface, 1);
+		_wl_fullscreen_shell_add_listener(d->fullscreen_shell, &fullscreen_shell_listener, d);
+#endif
 #if 0
 	} else if (strcmp(interface, "text_cursor_position") == 0) {
 		d->text_cursor_position = wl_registry_bind(registry, id, &text_cursor_position_interface, 1);
@@ -407,6 +428,14 @@ int UwacCloseDisplay(UwacDisplay *display) {
 
 	if (display->compositor)
 		wl_compositor_destroy(display->compositor);
+#ifdef BUILD_FULLSCREEN_SHELL
+	if (display->fullscreen_shell)
+		_wl_fullscreen_shell_destroy(display->fullscreen_shell);
+#endif
+#ifdef BUILD_IVI
+	if (display->ivi_application)
+		ivi_application_destroy(display->ivi_application);
+#endif
 	if (display->xdg_shell)
 		xdg_shell_destroy(display->xdg_shell);
 	if (display->shm)

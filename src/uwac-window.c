@@ -69,7 +69,7 @@ void UwacWindowDestroyBuffers(UwacWindow *w) {
 	w->buffers = NULL;
 }
 
-static void handle_configure(void *data, struct xdg_surface *surface,
+static void xdg_handle_configure(void *data, struct xdg_surface *surface,
 		 int32_t width, int32_t height,
 		 struct wl_array *states, uint32_t serial)
 {
@@ -135,7 +135,7 @@ ack:
 	xdg_surface_ack_configure(surface, serial);
 }
 
-static void handle_close(void *data, struct xdg_surface *xdg_surface)
+static void xdg_handle_close(void *data, struct xdg_surface *xdg_surface)
 {
 	UwacCloseEvent *event;
 	UwacWindow *window = (UwacWindow *)data;
@@ -150,10 +150,56 @@ static void handle_close(void *data, struct xdg_surface *xdg_surface)
 }
 
 static const struct xdg_surface_listener xdg_surface_listener = {
-	handle_configure,
-	handle_close,
+	xdg_handle_configure,
+	xdg_handle_close,
 };
 
+#if BUILD_IVI
+
+static void ivi_handle_configure(void *data, struct ivi_surface *surface,
+		 int32_t width, int32_t height)
+{
+	UwacWindow *window = (UwacWindow *)data;
+	UwacConfigureEvent *event;
+	int ret;
+
+
+	event = (UwacConfigureEvent *)UwacDisplayNewEvent(window->display, UWAC_EVENT_CONFIGURE);
+	if(!event) {
+		assert(uwacErrorHandler(window->display, UWAC_ERROR_NOMEMORY, "failed to allocate a configure event\n"));
+		return;
+	}
+
+	event->window = window;
+	event->states = 0;
+	if (width && height) {
+		event->width = width;
+		event->height = height;
+
+		UwacWindowDestroyBuffers(window);
+
+		window->width = width;
+		window->stride = width * bppFromShmFormat(window->format);
+		window->height = height;
+
+		ret = UwacWindowShmAllocBuffers(window, UWAC_INITIAL_BUFFERS, window->stride * height,
+				width, height, window->format);
+		if (ret != UWAC_SUCCESS) {
+			assert(uwacErrorHandler(window->display, ret, "failed to reallocate a wayland buffers\n"));
+			window->drawingBuffer = window->pendingBuffer = NULL;
+			return;
+		}
+		window->drawingBuffer = window->pendingBuffer = &window->buffers[0];
+	} else {
+		event->width = window->width;
+		event->height = window->height;
+	}
+}
+
+static const struct ivi_surface_listener ivi_surface_listener = {
+	ivi_handle_configure,
+};
+#endif
 
 int UwacWindowShmAllocBuffers(UwacWindow *w, int nbuffers, int allocSize, uint32_t width,
 		uint32_t height, enum wl_shm_format format)
@@ -266,6 +312,22 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 
 		xdg_surface_add_listener(w->xdg_surface, &xdg_surface_listener, w);
 		xdg_surface_set_title(w->xdg_surface, "simple-shm");
+#if BUILD_IVI
+	} else if (display->ivi_application) {
+		w->ivi_surface = ivi_application_surface_create(display->ivi_application, 1, w->surface);
+
+		assert (w->ivi_surface);
+
+		ivi_surface_add_listener(w->ivi_surface, &ivi_surface_listener, w);
+#endif
+#if BUILD_FULLSCREEN_SHELL
+	} else if (display->fullscreen_shell) {
+		_wl_fullscreen_shell_present_surface(display->fullscreen_shell, w->surface,
+				_WL_FULLSCREEN_SHELL_PRESENT_METHOD_CENTER, NULL);
+#endif
+	} else {
+		uwacErrorHandler(display, UWAC_ERROR_INTERNAL, "no suitable shell to display the surface");
+		goto out_error_shell;
 	}
 
 	wl_list_insert(display->windows.prev, &w->link);
@@ -273,6 +335,9 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 	display->last_error = UWAC_SUCCESS;
 	return w;
 
+out_error_shell:
+	wl_surface_destroy(w->surface);
+	UwacWindowDestroyBuffers(w);
 out_error_free:
 	free(w);
 	return NULL;
@@ -287,6 +352,10 @@ int UwacDestroyWindow(UwacWindow *w) {
 
 	if (w->xdg_surface)
 		xdg_surface_destroy(w->xdg_surface);
+#if BUILD_IVI
+	if (w->ivi_surface)
+		ivi_surface_destroy(w->ivi_surface);
+#endif
 
 	wl_surface_destroy(w->surface);
 	wl_list_remove(&w->link);
@@ -379,10 +448,12 @@ int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry) {
 
 
 int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen) {
-	if (isFullscreen) {
-		xdg_surface_set_fullscreen(window->xdg_surface, output ? output->output : NULL);
-	} else {
-		xdg_surface_unset_fullscreen(window->xdg_surface);
+	if (window->xdg_surface) {
+		if (isFullscreen) {
+			xdg_surface_set_fullscreen(window->xdg_surface, output ? output->output : NULL);
+		} else {
+			xdg_surface_unset_fullscreen(window->xdg_surface);
+		}
 	}
 	return UWAC_SUCCESS;
 }

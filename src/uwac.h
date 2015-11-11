@@ -24,7 +24,6 @@
 #define __UWAC_H_
 
 #include <wayland-client.h>
-#include <xdg-shell-client-protocol.h>
 #include <stdbool.h>
 
 typedef struct uwac_size UwacSize;

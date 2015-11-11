@@ -28,18 +28,20 @@
 static void draw(UwacWindow *window, uint32_t time) {
 	int x, y;
 	uint32_t *winData;
+	UwacSize geometry;
 
+	UwacWindowGetGeometry(window, &geometry);
 	winData = (uint32_t *)UwacWindowGetDrawingBuffer(window);
 	assert(winData);
 
-	for (y = 0; y < 480; y++) {
-		for(x = 0; x < 640; x++, winData++) {
+	for (y = 0; y < geometry.height; y++) {
+		for(x = 0; x < geometry.width; x++, winData++) {
 			*winData = 0xff000000 + ((x & 0xff) << 8) + y +
 					(time & 0xff) << 16;
 		}
 	}
 
-	UwacWindowAddDamage(window, 0, 0, 640, 480);
+	UwacWindowAddDamage(window, 0, 0, geometry.width, geometry.height);
 	UwacWindowSubmitBuffer(window, false);
 }
 
@@ -49,6 +51,7 @@ int main(int argc, char *argv[]) {
 	UwacEvent event;
 	int err, res, doRun;
 	uint32_t time;
+	bool fullscreen = false;
 
 	display = UwacOpenDisplay(NULL, &err);
 	if (!display) {
@@ -82,8 +85,20 @@ int main(int argc, char *argv[]) {
 			break;
 		case UWAC_EVENT_KEY:
 			printf("key sym=0x%x pressed=%d\n", event.key.sym, event.key.pressed);
-			if ((event.key.sym == XKB_KEY_Escape) && !event.key.pressed) /* stop when the ESC key is released */
+
+			/* we act only when the key is released */
+			if (event.key.pressed)
+				continue;
+
+			switch (event.key.sym) {
+			case XKB_KEY_Escape:
 				doRun = false;
+				break;
+			case XKB_KEY_f:
+				fullscreen ^= true;
+				UwacWindowSetFullscreenState(window, NULL, fullscreen);
+				break;
+			}
 			break;
 		case UWAC_EVENT_NEW_SEAT:
 			printf("new seat %p\n", event.seat_new.seat);
@@ -91,6 +106,20 @@ int main(int argc, char *argv[]) {
 		case UWAC_EVENT_REMOVED_SEAT:
 			printf("removed seat %p\n", event.seat_new.seat);
 			break;
+		case UWAC_EVENT_CONFIGURE: {
+			UwacConfigureEvent *ev = &event.configure;
+			printf("configure event %dx%d", ev->width, ev->height);
+			if (ev->states & UWAC_WINDOW_ACTIVATED)
+				printf(" activated");
+			if (ev->states & UWAC_WINDOW_FULLSCREEN)
+				printf(" fullscreen");
+			if (ev->states & UWAC_WINDOW_MAXIMIZED)
+				printf(" maximized");
+			if (ev->states & UWAC_WINDOW_RESIZING)
+				printf(" resizing");
+			printf("\n");
+			break;
+		}
 		default:
 			break;
 		}
