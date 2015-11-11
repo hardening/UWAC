@@ -171,6 +171,7 @@ typedef struct uwac_buffer UwacBuffer;
 struct uwac_window {
 	UwacDisplay *display;
 	int width, height, stride;
+	int surfaceStates;
 	enum wl_shm_format format;
 
 	int nbuffers;

@@ -81,7 +81,16 @@ enum {
 	UWAC_EVENT_TOUCH_MOTION,
 	UWAC_EVENT_TOUCH_CANCEL,
 	UWAC_EVENT_TOUCH_FRAME_END,
-	UWAC_EVENT_FRAME_DONE
+	UWAC_EVENT_FRAME_DONE,
+	UWAC_EVENT_CLOSE,
+};
+
+/** @brief */
+enum {
+	UWAC_WINDOW_MAXIMIZED 	= 0x1,
+	UWAC_WINDOW_RESIZING 	= 0x2,
+	UWAC_WINDOW_FULLSCREEN 	= 0x4,
+	UWAC_WINDOW_ACTIVATED 	= 0x8,
 };
 
 struct uwac_new_output_event {
@@ -160,6 +169,15 @@ struct uwac_frame_done_event {
 };
 typedef struct uwac_frame_done_event UwacFrameDoneEvent;
 
+struct uwac_configure_event {
+	int type;
+	UwacWindow *window;
+	int32_t width;
+	int32_t height;
+	int states;
+};
+typedef struct uwac_configure_event UwacConfigureEvent;
+
 struct uwac_key_event {
 	int type;
 	UwacWindow *window;
@@ -167,6 +185,12 @@ struct uwac_key_event {
 	bool pressed;
 };
 typedef struct uwac_key_event UwacKeyEvent;
+
+struct uwac_close_event {
+	int type;
+	UwacWindow *window;
+};
+typedef struct uwac_close_event UwacCloseEvent;
 
 
 /** @brief */
@@ -185,6 +209,8 @@ struct uwac_event {
 		UwacTouchFrameEnd touchFrameEnd;
 		UwacTouchCancel touchCancel;
 		UwacFrameDoneEvent frame_done;
+		UwacConfigureEvent configure;
+		UwacCloseEvent close;
 	};
 
 };
@@ -332,6 +358,20 @@ int UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t wid
  */
 int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame);
 
+/**
+ *
+ * @param window
+ * @param geometry
+ * @return
+ */
+int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry);
+
+/**
+ *
+ * @param window
+ * @return
+ */
+int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen);
 
 /** Waits until an event occurs, and when it's there copy the event from the queue to
  * event.

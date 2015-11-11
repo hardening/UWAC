@@ -73,11 +73,12 @@ bool UwacTouchAutomataInjectEvent(UwacTouchAutomata *automata, UwacEvent *event)
 		}
 
 		tp = wl_array_add(&automata->tp, sizeof(UwacTouchPoint));
-		if (tp) {
-			tp->id = touchDown->id;
-			tp->x = touchDown->x;
-			tp->y = touchDown->y;
-		}
+		if (!tp)
+			return false;
+
+		tp->id = touchDown->id;
+		tp->x = touchDown->x;
+		tp->y = touchDown->y;
 		break;
 	}
 
