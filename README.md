@@ -16,9 +16,8 @@ is not supported yet;
 * double buffering of window content: so that you can draw while a frame is beeing rendered
 by the compositor;
 * handle seats with keyboard, pointer (mouse) and touch devices. UWAC is multi-seat aware (even if
-most application may don't care);
-* an event system that looks like the X11 one. With extra bonus that you will be notified when it's a good idea to 
-update graphical content for a frame;
+most application may not care);
+* an event system that looks like the X11 one;
 * supports for XDG, fullscreen and IVI shells;
 
 # Dependencies
