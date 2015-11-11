@@ -21,7 +21,12 @@ libuwac_la_SOURCES = \
 	src/uwac-window.c \
 	src/uwac-tools.c
 libuwac_la_LIBADD = $(UWAC_LIBS) 
-	 
+
+libuwacincludedir = $(includedir)/uwac
+libuwacinclude_HEADERS= \
+	src/uwac.h \
+	src/uwac-utils.h
+
 nodist_libuwac_la_SOURCES =					\
 	protocol/xdg-shell-protocol.c		\
 	protocol/xdg-shell-client-protocol.h

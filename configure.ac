@@ -6,10 +6,10 @@ m4_define([uwac_micro_version], [0])
 m4_define([uwac_version],
           [uwac_major_version.uwac_minor_version.uwac_micro_version])
 
-AC_INIT([libuwac],
+AC_INIT([uwac],
         [uwac_version],
         [http://github.com/hardening/libuwac],
-        [libuwac],
+        [uwac],
         [http://wayland.freedesktop.org/])
 
 AC_SUBST([UWAC_VERSION_MAJOR], [uwac_major_version])
