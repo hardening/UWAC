@@ -125,6 +125,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	UwacDestroyWindow(window);
-	UwacCloseDisplay(display);
+	UwacDestroyWindow(&window);
+	UwacCloseDisplay(&display);
 }

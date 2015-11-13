@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
 		goto out;
 	}
 
-	UwacCloseDisplay(display);
+	UwacCloseDisplay(&display);
 	ret = 0;
 
 out:

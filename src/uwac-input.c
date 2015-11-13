@@ -119,9 +119,9 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard, uint
 	uint32_t *key, *pressedKey;
 	UwacSeat *input = (UwacSeat *)data;
 	int i, found, toMove;
-	UwacPointerEnterLeaveEvent *event;
+	UwacKeyboardEnterLeaveEvent *event;
 
-	event = (UwacPointerEnterLeaveEvent *)UwacDisplayNewEvent(input->display, UWAC_EVENT_POINTER_ENTER);
+	event = (UwacKeyboardEnterLeaveEvent *)UwacDisplayNewEvent(input->display, UWAC_EVENT_KEYBOARD_ENTER);
 	if (!event)
 		return;
 
@@ -273,6 +273,7 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
 
 	keyEvent->window = window;
 	keyEvent->sym =  sym;
+	keyEvent->raw_key = key;
 	keyEvent->pressed = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
 }
 
@@ -566,12 +567,6 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 		return;
 	}
 
-
-/*	if (surface != window->main_surface->surface) {
-		DBG("Ignoring input event from subsurface %p\n", surface);
-		return;
-	}*/
-
 	input->display->serial = serial;
 	window = wl_surface_get_user_data(surface);
 	if (window)
@@ -586,6 +581,8 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_
 
 	event->seat = input;
 	event->window = window;
+	event->x = sx;
+	event->y = sy;
 }
 
 static void pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial,

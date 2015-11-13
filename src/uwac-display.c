@@ -397,18 +397,21 @@ int UwacDisplayGetLastError(const UwacDisplay *display) {
 	return display->last_error;
 }
 
-int UwacCloseDisplay(UwacDisplay *display) {
+int UwacCloseDisplay(UwacDisplay **pdisplay) {
+	UwacDisplay *display;
 	UwacSeat *seat, *tmpSeat;
 	UwacWindow *window, *tmpWindow;
 	UwacOutput *output, *tmpOutput;
 	UwacGlobal *global, *tmpGlobal;
 
+	assert(pdisplay);
+	display = *pdisplay;
 	if (!display)
 		return UWAC_ERROR_INVALID_DISPLAY;
 
 	/* destroy windows */
 	wl_list_for_each_safe(window, tmpWindow, &display->windows, link) {
-		UwacDestroyWindow(window);
+		UwacDestroyWindow(&window);
 	}
 
 	/* destroy seats */
@@ -461,7 +464,12 @@ int UwacCloseDisplay(UwacDisplay *display) {
 	}
 
 	free(display);
-	return 0;
+	*pdisplay = NULL;
+	return UWAC_SUCCESS;
+}
+
+int UwacDisplayGetFd(UwacDisplay *display) {
+	return wl_display_get_fd(display->display);
 }
 
 static const char *errorStrings[] = {
@@ -572,6 +580,10 @@ UwacEvent *UwacDisplayNewEvent(UwacDisplay *display, int type) {
 		display->pop_queue = ret;
 	display->push_queue = ret;
 	return &ret->event;
+}
+
+bool UwacHasEvent(UwacDisplay *display) {
+	return display->pop_queue != NULL;
 }
 
 

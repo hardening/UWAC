@@ -311,7 +311,6 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 		assert(w->xdg_surface);
 
 		xdg_surface_add_listener(w->xdg_surface, &xdg_surface_listener, w);
-		xdg_surface_set_title(w->xdg_surface, "simple-shm");
 #if BUILD_IVI
 	} else if (display->ivi_application) {
 		w->ivi_surface = ivi_application_surface_create(display->ivi_application, 1, w->surface);
@@ -344,7 +343,12 @@ out_error_free:
 }
 
 
-int UwacDestroyWindow(UwacWindow *w) {
+int UwacDestroyWindow(UwacWindow **pwindow) {
+	UwacWindow *w;
+
+	assert (pwindow);
+
+	w = *pwindow;
 	UwacWindowDestroyBuffers(w);
 
 	if (w->frame_callback)
@@ -361,6 +365,7 @@ int UwacDestroyWindow(UwacWindow *w) {
 	wl_list_remove(&w->link);
 	free(w);
 
+	*pwindow = NULL;
 	return UWAC_SUCCESS;
 }
 
@@ -456,4 +461,9 @@ int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool is
 		}
 	}
 	return UWAC_SUCCESS;
+}
+
+void UwacWindowSetTitle(UwacWindow *window, const char *name) {
+	if (window->xdg_surface)
+		xdg_surface_set_title(window->xdg_surface, name);
 }

@@ -73,6 +73,7 @@ enum {
 	UWAC_EVENT_POINTER_MOTION,
 	UWAC_EVENT_POINTER_BUTTONS,
 	UWAC_EVENT_POINTER_AXIS,
+	UWAC_EVENT_KEYBOARD_ENTER,
 	UWAC_EVENT_KEY,
 	UWAC_EVENT_TOUCH_FRAME_BEGIN,
 	UWAC_EVENT_TOUCH_UP,
@@ -106,10 +107,18 @@ typedef struct uwac_new_seat_event UwacSeatNewEvent;
 
 typedef struct uwac_new_seat_event UwacSeatRemovedEvent;
 
+struct uwac_keyboard_enter_event {
+	int type;
+	UwacWindow *window;
+	UwacSeat *seat;
+};
+typedef struct uwac_keyboard_enter_event UwacKeyboardEnterLeaveEvent;
+
 struct uwac_pointer_enter_event {
 	int type;
 	UwacWindow *window;
 	UwacSeat *seat;
+	uint32_t x, y;
 };
 typedef struct uwac_pointer_enter_event UwacPointerEnterLeaveEvent;
 
@@ -125,7 +134,7 @@ struct uwac_pointer_button_event {
 	int type;
 	UwacWindow *window;
 	UwacSeat *seat;
-	wl_fixed_t x, y;
+	uint32_t x, y;
 	uint32_t button;
 	enum wl_pointer_button_state state;
 };
@@ -180,6 +189,7 @@ typedef struct uwac_configure_event UwacConfigureEvent;
 struct uwac_key_event {
 	int type;
 	UwacWindow *window;
+	uint32_t raw_key;
 	uint32_t sym;
 	bool pressed;
 };
@@ -200,6 +210,9 @@ struct uwac_event {
 		UwacSeatNewEvent seat_new;
 		UwacPointerEnterLeaveEvent mouse_enter_leave;
 		UwacPointerMotionEvent mouse_motion;
+		UwacPointerButtonEvent mouse_button;
+		UwacPointerAxisEvent mouse_axis;
+		UwacKeyboardEnterLeaveEvent keyboard_enter_leave;
 		UwacKeyEvent key;
 		UwacTouchFrameBegin touchFrameBegin;
 		UwacTouchUp touchUp;
@@ -237,11 +250,17 @@ UwacDisplay *UwacOpenDisplay(const char *name, int *err);
 
 /**
  *
- * @param display the display to close
+ * @param pdisplay a pointer on the display to close
  * @return 0 if the operation was successful, -1 otherwise
  */
-int UwacCloseDisplay(UwacDisplay *display);
+int UwacCloseDisplay(UwacDisplay **pdisplay);
 
+/**
+ *
+ * @param display
+ * @return
+ */
+int UwacDisplayGetFd(UwacDisplay *display);
 
 /**
  *
@@ -328,7 +347,7 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
  * @param window the window to destroy
  * @return if the operation completed successfully
  */
-int UwacDestroyWindow(UwacWindow *window);
+int UwacDestroyWindow(UwacWindow **window);
 
 /**
  *	retrieves a pointer on the current window content to draw a frame
@@ -371,6 +390,28 @@ int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry);
  * @return
  */
 int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen);
+
+/**
+ *
+ * @param window
+ * @param name
+ */
+void UwacWindowSetTitle(UwacWindow *window, const char *name);
+
+/**
+ *
+ * @param display
+ * @param timeout
+ * @return
+ */
+int UwacDisplayDispatch(UwacDisplay *display, int timeout);
+
+/**
+ *
+ * @param display
+ * @return
+ */
+bool UwacHasEvent(UwacDisplay *display);
 
 /** Waits until an event occurs, and when it's there copy the event from the queue to
  * event.
