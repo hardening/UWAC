@@ -473,13 +473,14 @@ UwacReturnCode UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNex
 	UwacSubmitBufferPtr(window, drawingBuffer);
 
 	window->pendingBuffer = window->drawingBuffer;
-	if (copyContentForNextFrame) {
-		memcpy(window->pendingBuffer->data, window->drawingBuffer->data, window->stride * window->height);
-	}
-
 	window->drawingBuffer = UwacWindowFindFreeBuffer(window);
 	if (!window->drawingBuffer)
 		return UWAC_ERROR_NOMEMORY;
+
+	if (copyContentForNextFrame) {
+		memcpy(window->drawingBuffer->data, window->pendingBuffer->data, window->stride * window->height);
+	}
+
 	return UWAC_SUCCESS;
 }
 
