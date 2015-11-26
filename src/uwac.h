@@ -34,7 +34,7 @@ typedef struct uwac_seat UwacSeat;
 
 
 /** @brief error codes */
-enum {
+typedef enum {
 	UWAC_SUCCESS = 0,
 	UWAC_ERROR_NOMEMORY,
 	UWAC_ERROR_UNABLE_TO_CONNECT,
@@ -46,7 +46,7 @@ enum {
 	UWAC_ERROR_INTERNAL,
 
 	UWAC_ERROR_LAST,
-};
+} UwacReturnCode;
 
 /** @brief input modifiers */
 enum {
@@ -85,7 +85,7 @@ enum {
 	UWAC_EVENT_CLOSE,
 };
 
-/** @brief */
+/** @brief window states */
 enum {
 	UWAC_WINDOW_MAXIMIZED 	= 0x1,
 	UWAC_WINDOW_RESIZING 	= 0x2,
@@ -203,38 +203,38 @@ typedef struct uwac_close_event UwacCloseEvent;
 
 
 /** @brief */
-struct uwac_event {
-	union {
-		int type;
-		UwacOutputNewEvent output_new;
-		UwacSeatNewEvent seat_new;
-		UwacPointerEnterLeaveEvent mouse_enter_leave;
-		UwacPointerMotionEvent mouse_motion;
-		UwacPointerButtonEvent mouse_button;
-		UwacPointerAxisEvent mouse_axis;
-		UwacKeyboardEnterLeaveEvent keyboard_enter_leave;
-		UwacKeyEvent key;
-		UwacTouchFrameBegin touchFrameBegin;
-		UwacTouchUp touchUp;
-		UwacTouchDown touchDown;
-		UwacTouchMotion touchMotion;
-		UwacTouchFrameEnd touchFrameEnd;
-		UwacTouchCancel touchCancel;
-		UwacFrameDoneEvent frame_done;
-		UwacConfigureEvent configure;
-		UwacCloseEvent close;
-	};
-
+union uwac_event {
+	int type;
+	UwacOutputNewEvent output_new;
+	UwacSeatNewEvent seat_new;
+	UwacPointerEnterLeaveEvent mouse_enter_leave;
+	UwacPointerMotionEvent mouse_motion;
+	UwacPointerButtonEvent mouse_button;
+	UwacPointerAxisEvent mouse_axis;
+	UwacKeyboardEnterLeaveEvent keyboard_enter_leave;
+	UwacKeyEvent key;
+	UwacTouchFrameBegin touchFrameBegin;
+	UwacTouchUp touchUp;
+	UwacTouchDown touchDown;
+	UwacTouchMotion touchMotion;
+	UwacTouchFrameEnd touchFrameEnd;
+	UwacTouchCancel touchCancel;
+	UwacFrameDoneEvent frame_done;
+	UwacConfigureEvent configure;
+	UwacCloseEvent close;
 };
-typedef struct uwac_event UwacEvent;
+typedef union uwac_event UwacEvent;
 
-typedef bool (*UwacErrorHandler)(UwacDisplay *d, int code, const char *msg, ...);
+typedef bool (*UwacErrorHandler)(UwacDisplay *d, UwacReturnCode code, const char *msg, ...);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
+ *	install a handler that will be called when UWAC encounter internal errors. The
+ *	handler is supposed to answer if the execution can continue. I can also be used
+ *	to log things.
  *
  * @param handler
  */
@@ -242,32 +242,38 @@ void UwacInstallErrorHandler(UwacErrorHandler handler);
 
 
 /**
+ *	Opens the corresponding wayland display, using NULL you will open the default
+ *	display.
  *
- * @param name
- * @return
+ * @param name the name of the display to open
+ * @return the created UwacDisplay object
  */
-UwacDisplay *UwacOpenDisplay(const char *name, int *err);
+UwacDisplay *UwacOpenDisplay(const char *name, UwacReturnCode *err);
 
 /**
+ *	closes the corresponding UwacDisplay
  *
  * @param pdisplay a pointer on the display to close
- * @return 0 if the operation was successful, -1 otherwise
+ * @return UWAC_SUCCESS if the operation was successful, the corresponding error otherwise
  */
-int UwacCloseDisplay(UwacDisplay **pdisplay);
+UwacReturnCode UwacCloseDisplay(UwacDisplay **pdisplay);
 
 /**
+ * Returns the file descriptor associated with the UwacDisplay, this is useful when
+ * you want to poll that file descriptor for activity.
  *
- * @param display
- * @return
+ * @param display an opened UwacDisplay
+ * @return the corresponding descriptor
  */
 int UwacDisplayGetFd(UwacDisplay *display);
 
 /**
+ *	Returns a human readable form of a Uwac error code
  *
- * @param error
- * @return
+ * @param error the error number
+ * @return the associated string
  */
-const char *UwacErrorString(int error);
+const char *UwacErrorString(UwacReturnCode error);
 
 /**
  * returns the last error that occurred on a display
@@ -275,7 +281,7 @@ const char *UwacErrorString(int error);
  * @param display the display
  * @return the last error that have been set for this display
  */
-int UwacDisplayGetLastError(const UwacDisplay *display);
+UwacReturnCode UwacDisplayGetLastError(const UwacDisplay *display);
 
 /**
  * retrieves the version of a given interface
@@ -285,24 +291,26 @@ int UwacDisplayGetLastError(const UwacDisplay *display);
  * @param version the output variable for the version
  * @return UWAC_SUCCESS if the interface was found, UWAC_NOT_FOUND otherwise
  */
-int UwacDisplayQueryInterfaceVersion(const UwacDisplay *display, const char *name, uint32_t *version);
+UwacReturnCode UwacDisplayQueryInterfaceVersion(const UwacDisplay *display, const char *name, uint32_t *version);
 
 /**
+ *	returns the number SHM formats that have been reported by the compositor
  *
- * @param display
+ * @param display a connected UwacDisplay
  * @return the number of SHM formats supported
  */
 uint32_t UwacDisplayQueryGetNbShmFormats(UwacDisplay *display);
 
 /**
+ *	returns the supported ShmFormats
  *
- * @param display
- * @param formats
- * @param formats_size
- * @param filled
- * @return
+ * @param display a connected UwacDisplay
+ * @param formats a pointer on an array of wl_shm_format with enough place for formats_size items
+ * @param formats_size the size of the formats array
+ * @param filled the number of filled entries in the formats array
+ * @return UWAC_SUCCESS on success, an error otherwise
  */
-int UwacDisplayQueryShmFormats(const UwacDisplay *display, enum wl_shm_format *formats, int formats_size, int *filled);
+UwacReturnCode UwacDisplayQueryShmFormats(const UwacDisplay *display, enum wl_shm_format *formats, int formats_size, int *filled);
 
 /**
  *	returns the number of registered outputs
@@ -313,21 +321,22 @@ int UwacDisplayQueryShmFormats(const UwacDisplay *display, enum wl_shm_format *f
 uint32_t UwacDisplayGetNbOutputs(UwacDisplay *display);
 
 /**
- *	retrieve a particular output
+ *	retrieve a particular UwacOutput object
  *
  * @param display the display to query
  * @param index index of the output
- * @return the given output, NULL if something failed (so you should query UwacDisplayGetLastError() to have the reason)
+ * @return the given UwacOutput, NULL if something failed (so you should query UwacDisplayGetLastError() to have the reason)
  */
 UwacOutput *UwacDisplayGetOutput(UwacDisplay *display, int index);
 
 /**
+ * retrieve the resolution of a given UwacOutput
  *
- * @param output
- * @param resolution
- * @return
+ * @param output the UwacOutput
+ * @param resolution a pointer on the
+ * @return UWAC_SUCCESS on success
  */
-int UwacOutputGetResolution(UwacOutput *output, UwacSize *resolution);
+UwacReturnCode UwacOutputGetResolution(UwacOutput *output, UwacSize *resolution);
 
 
 /**
@@ -342,12 +351,36 @@ int UwacOutputGetResolution(UwacOutput *output, UwacSize *resolution);
 UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t height, enum wl_shm_format format);
 
 /**
- *	destroys a window
+ *	destroys the corresponding UwacWindow
  *
- * @param window the window to destroy
+ * @param window a pointer on the UwacWindow to destroy
  * @return if the operation completed successfully
  */
-int UwacDestroyWindow(UwacWindow **window);
+UwacReturnCode UwacDestroyWindow(UwacWindow **window);
+
+/**
+ *	Sets the region that should be considered opaque to the compositor.
+ *
+ * @param window the UwacWindow
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ * @return UWAC_SUCCESS on success, an error otherwise
+ */
+UwacReturnCode UwacWindowSetOpaqueRegion(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+
+/**
+ *	Sets the region of the window that can trigger input events
+ *
+ * @param window the UwacWindow
+ * @param x
+ * @param y
+ * @param width
+ * @param height
+ * @return
+ */
+UwacReturnCode UwacWindowSetInputRegion(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 
 /**
  *	retrieves a pointer on the current window content to draw a frame
@@ -364,37 +397,45 @@ void *UwacWindowGetDrawingBuffer(UwacWindow *window);
  * @param y top coordinate
  * @param width the width of the dirty rectangle
  * @param height the height of the dirty rectangle
- * @return UWAC_SUCCESS on sucess, an Uwac error otherwise
+ * @return UWAC_SUCCESS on success, an Uwac error otherwise
  */
-int UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+UwacReturnCode UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 
 /**
+ *	Sends a frame to the compositor with the content of the drawing buffer
  *
- * @param window
- * @param copyContentForNextFrame
- * @return
+ * @param window the UwacWindow to refresh
+ * @param copyContentForNextFrame if true the content to display is copied in the next drawing buffer
+ * @return UWAC_SUCCESS if the operation was successful
  */
-int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame);
+UwacReturnCode UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame);
 
 /**
+ *	returns the geometry of the given UwacWindows
  *
- * @param window
- * @param geometry
- * @return
+ * @param window the UwacWindow
+ * @param geometry the geometry to fill
+ * @return UWAC_SUCCESS on success, an Uwac error otherwise
  */
-int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry);
+UwacReturnCode UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry);
 
 /**
+ *	Sets or unset the fact that the window is set fullscreen. After this call the
+ *	application should get prepared to receive a configure event. The output is used
+ *	only when going fullscreen, it is optional and not used when exiting fullscreen.
  *
- * @param window
- * @return
+ * @param window the UwacWindow
+ * @param output an optional UwacOutput to put the window fullscreen on
+ * @param isFullscreen set or unset fullscreen
+ * @return UWAC_SUCCESS if the operation was a success
  */
-int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen);
+UwacReturnCode UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen);
 
 /**
+ *	When possible (depending on the shell) sets the title of the UwacWindow
  *
- * @param window
- * @param name
+ * @param window the UwacWindow
+ * @param name title
  */
 void UwacWindowSetTitle(UwacWindow *window, const char *name);
 
@@ -407,9 +448,10 @@ void UwacWindowSetTitle(UwacWindow *window, const char *name);
 int UwacDisplayDispatch(UwacDisplay *display, int timeout);
 
 /**
+ *	Returns if you have some pending events, and you can UwacNextEvent() without blocking
  *
- * @param display
- * @return
+ * @param display the UwacDisplay
+ * @return if there's some pending events
  */
 bool UwacHasEvent(UwacDisplay *display);
 
@@ -420,11 +462,13 @@ bool UwacHasEvent(UwacDisplay *display);
  * @param event the event to fill
  * @return if the operation completed successfully
  */
-int UwacNextEvent(UwacDisplay *display, UwacEvent *event);
+UwacReturnCode UwacNextEvent(UwacDisplay *display, UwacEvent *event);
 
 
 /**
- * @param seat
+ * returns the name of the given UwacSeat
+ *
+ * @param seat the UwacSeat
  * @return the name of the seat
  */
 const char *UwacSeatGetName(const UwacSeat *seat);

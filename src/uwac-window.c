@@ -305,6 +305,7 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 
 	w->surface = wl_compositor_create_surface(display->compositor);
 	wl_surface_set_user_data(w->surface, w);
+
 	if (display->xdg_shell) {
 		w->xdg_surface = xdg_shell_get_xdg_surface(display->xdg_shell, w->surface);
 
@@ -343,7 +344,7 @@ out_error_free:
 }
 
 
-int UwacDestroyWindow(UwacWindow **pwindow) {
+UwacReturnCode UwacDestroyWindow(UwacWindow **pwindow) {
 	UwacWindow *w;
 
 	assert (pwindow);
@@ -361,6 +362,12 @@ int UwacDestroyWindow(UwacWindow **pwindow) {
 		ivi_surface_destroy(w->ivi_surface);
 #endif
 
+	if (w->opaque_region)
+		wl_region_destroy(w->opaque_region);
+
+	if (w->input_region)
+		wl_region_destroy(w->opaque_region);
+
 	wl_surface_destroy(w->surface);
 	wl_list_remove(&w->link);
 	free(w);
@@ -368,6 +375,40 @@ int UwacDestroyWindow(UwacWindow **pwindow) {
 	*pwindow = NULL;
 	return UWAC_SUCCESS;
 }
+
+
+UwacReturnCode UwacWindowSetOpaqueRegion(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width,
+		uint32_t height)
+{
+	assert(window);
+
+	if (window->opaque_region)
+		wl_region_destroy(window->opaque_region);
+
+	window->opaque_region = wl_compositor_create_region(window->display->compositor);
+	if (!window->opaque_region)
+		return UWAC_ERROR_NOMEMORY;
+
+	wl_region_add(window->opaque_region, x, y, width, height);
+	wl_surface_set_opaque_region(window->surface, window->opaque_region);
+	return UWAC_SUCCESS;
+}
+
+UwacReturnCode UwacWindowSetInputRegion(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	assert(window);
+
+	if (window->input_region)
+		wl_region_destroy(window->input_region);
+
+	window->input_region = wl_compositor_create_region(window->display->compositor);
+	if (!window->input_region)
+		return UWAC_ERROR_NOMEMORY;
+
+	wl_region_add(window->input_region, x, y, width, height);
+	wl_surface_set_input_region(window->surface, window->input_region);
+	return UWAC_SUCCESS;
+}
+
 
 void *UwacWindowGetDrawingBuffer(UwacWindow *window) {
 	return window->drawingBuffer->data;
@@ -412,7 +453,7 @@ static void frame_done_cb(void *data, struct wl_callback *callback, uint32_t tim
 }
 
 
-int UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+UwacReturnCode UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
 	if(!pixman_region32_union_rect(&window->drawingBuffer->damage, &window->drawingBuffer->damage, x, y, width, height))
 		return UWAC_ERROR_INTERNAL;
 
@@ -420,7 +461,7 @@ int UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, uint32_t wid
 }
 
 
-int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame) {
+UwacReturnCode UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame) {
 	UwacBuffer *drawingBuffer = window->drawingBuffer;
 	pixman_box32_t box;
 
@@ -442,7 +483,7 @@ int UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame) {
 	return UWAC_SUCCESS;
 }
 
-int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry) {
+UwacReturnCode UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry) {
 	assert(window);
 	assert(geometry);
 
@@ -452,7 +493,7 @@ int UwacWindowGetGeometry(UwacWindow *window, UwacSize *geometry) {
 }
 
 
-int UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen) {
+UwacReturnCode UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *output, bool isFullscreen) {
 	if (window->xdg_surface) {
 		if (isFullscreen) {
 			xdg_surface_set_fullscreen(window->xdg_surface, output ? output->output : NULL);

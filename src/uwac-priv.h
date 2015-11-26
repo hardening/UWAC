@@ -97,7 +97,7 @@ struct uwac_display {
 	struct wl_list seats;
 
 	int display_fd;
-	int last_error;
+	UwacReturnCode last_error;
 	uint32_t display_fd_events;
 	int epoll_fd;
 	bool running;
@@ -192,6 +192,8 @@ struct uwac_window {
 	int nbuffers;
 	UwacBuffer *buffers;
 
+	struct wl_region *opaque_region;
+	struct wl_region *input_region;
 	struct wl_callback *frame_callback;
 	UwacBuffer *drawingBuffer, *pendingBuffer;
 	struct wl_surface *surface;

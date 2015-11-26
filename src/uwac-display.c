@@ -48,6 +48,7 @@ static const char *event_names[] = {
 	"pointer motion",
 	"pointer buttons",
 	"pointer axis",
+	"keyboard enter",
 	"key",
 	"touch frame begin",
 	"touch up",
@@ -56,10 +57,11 @@ static const char *event_names[] = {
 	"touch cancel",
 	"touch frame end",
 	"frame done",
+	"close",
 	NULL
 };
 
-bool uwac_default_error_handler(UwacDisplay *display, int code, const char *msg, ...) {
+bool uwac_default_error_handler(UwacDisplay *display, UwacReturnCode code, const char *msg, ...) {
 	va_list args;
 	va_start(args, msg);
 
@@ -302,7 +304,7 @@ static void display_dispatch_events(UwacTask *task, uint32_t events)
 }
 
 
-UwacDisplay *UwacOpenDisplay(const char *name, int *err) {
+UwacDisplay *UwacOpenDisplay(const char *name, UwacReturnCode *err) {
 	UwacDisplay *ret;
 
 	ret = (UwacDisplay *)calloc(1, sizeof(*ret));
@@ -393,11 +395,11 @@ int UwacDisplayDispatch(UwacDisplay *display, int timeout) {
 
 
 
-int UwacDisplayGetLastError(const UwacDisplay *display) {
+UwacReturnCode UwacDisplayGetLastError(const UwacDisplay *display) {
 	return display->last_error;
 }
 
-int UwacCloseDisplay(UwacDisplay **pdisplay) {
+UwacReturnCode UwacCloseDisplay(UwacDisplay **pdisplay) {
 	UwacDisplay *display;
 	UwacSeat *seat, *tmpSeat;
 	UwacWindow *window, *tmpWindow;
@@ -469,7 +471,7 @@ int UwacCloseDisplay(UwacDisplay **pdisplay) {
 }
 
 int UwacDisplayGetFd(UwacDisplay *display) {
-	return wl_display_get_fd(display->display);
+	return display->epoll_fd;
 }
 
 static const char *errorStrings[] = {
@@ -485,14 +487,14 @@ static const char *errorStrings[] = {
 	"internal error",
 };
 
-const char *UwacErrorString(int error) {
+const char *UwacErrorString(UwacReturnCode error) {
 	if (error < 0 || error >= UWAC_ERROR_LAST)
 		return "invalid error code";
 
 	return errorStrings[error];
 }
 
-int UwacDisplayQueryInterfaceVersion(const UwacDisplay *display, const char *name, uint32_t *version) {
+UwacReturnCode UwacDisplayQueryInterfaceVersion(const UwacDisplay *display, const char *name, uint32_t *version) {
 	const UwacGlobal *global;
 
 	if (!display)
@@ -525,9 +527,7 @@ uint32_t UwacDisplayQueryGetNbShmFormats(UwacDisplay *display) {
 }
 
 
-int UwacDisplayQueryShmFormats(const UwacDisplay *display, enum wl_shm_format *formats, int formats_size, int *filled) {
-	int ret;
-
+UwacReturnCode UwacDisplayQueryShmFormats(const UwacDisplay *display, enum wl_shm_format *formats, int formats_size, int *filled) {
 	if (!display)
 		return UWAC_ERROR_INVALID_DISPLAY;
 
@@ -556,6 +556,12 @@ UwacOutput *UwacDisplayGetOutput(UwacDisplay *display, int index) {
 	display->last_error = UWAC_SUCCESS;
 	return container_of(l, UwacOutput, link);
 }
+
+UwacReturnCode UwacOutputGetResolution(UwacOutput *output, UwacSize *resolution) {
+	*resolution = output->resolution;
+	return UWAC_SUCCESS;
+}
+
 
 UwacEvent *UwacDisplayNewEvent(UwacDisplay *display, int type) {
 	UwacEventListItem *ret;
@@ -587,7 +593,7 @@ bool UwacHasEvent(UwacDisplay *display) {
 }
 
 
-int UwacNextEvent(UwacDisplay *display, UwacEvent *event) {
+UwacReturnCode UwacNextEvent(UwacDisplay *display, UwacEvent *event) {
 	UwacEventListItem *prevItem;
 	int ret;
 

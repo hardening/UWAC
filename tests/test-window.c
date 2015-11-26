@@ -49,7 +49,8 @@ int main(int argc, char *argv[]) {
 	UwacDisplay *display;
 	UwacWindow *window;
 	UwacEvent event;
-	int err, res, doRun;
+	UwacReturnCode err;
+	int doRun;
 	uint32_t time;
 	bool fullscreen = false;
 
@@ -72,8 +73,8 @@ int main(int argc, char *argv[]) {
 
 	doRun = 1;
 	while (doRun) {
-		res = UwacNextEvent(display, &event);
-		if (res != UWAC_SUCCESS) {
+		err = UwacNextEvent(display, &event);
+		if (err != UWAC_SUCCESS) {
 			doRun = 0;
 			break;
 		}
@@ -117,6 +118,7 @@ int main(int argc, char *argv[]) {
 				printf(" maximized");
 			if (ev->states & UWAC_WINDOW_RESIZING)
 				printf(" resizing");
+
 			printf("\n");
 			break;
 		}

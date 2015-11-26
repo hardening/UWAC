@@ -25,7 +25,8 @@
 int main(int argc, char *argv[]) {
 	UwacDisplay *display;
 	UwacOutput *output;
-	int err, ret, i;
+	UwacReturnCode err;
+	int ret, i;
 	uint32_t val;
 	uint32_t version;
 	const char *interface_names[] = {
