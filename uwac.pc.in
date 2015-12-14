@@ -10,4 +10,4 @@ Description: UWCA library
 Version: @UWAC_VERSION@
 Cflags: -I${includedir}
 Libs: -L${libdir} -luwac
-Requires: wayland-client > 0.9, xkbcommon, pixman-1
+Requires: wayland-client > 1.9.0, xkbcommon, pixman-1

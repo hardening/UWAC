@@ -34,6 +34,7 @@
 
 #define TARGET_COMPOSITOR_INTERFACE 3
 #define TARGET_SHM_INTERFACE 1
+#define TARGET_SHELL_INTERFACE 1
 #define TARGET_DDM_INTERFACE 1
 #define TARGET_SEAT_INTERFACE 5
 #define TARGET_XDG_VERSION 5 /* The version of xdg-shell that we implement */
@@ -162,7 +163,6 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		if (ev)
 			ev->output = output;
 
-		//display_add_output(d, id);
 	} else if (strcmp(interface, "wl_seat") == 0) {
 		UwacSeatNewEvent *ev;
 		UwacSeat *seat;
@@ -182,6 +182,8 @@ static void registry_handle_global(void *data, struct wl_registry *registry, uin
 		ev->seat = seat;
 	} else if (strcmp(interface, "wl_data_device_manager") == 0) {
 		d->data_device_manager = wl_registry_bind(registry, id, &wl_data_device_manager_interface, min(TARGET_DDM_INTERFACE, version));
+	} else if (strcmp(interface, "wl_shell") == 0) {
+		d->shell = wl_registry_bind(registry, id, &wl_shell_interface, min(TARGET_SHELL_INTERFACE, version));
 	} else if (strcmp(interface, "xdg_shell") == 0) {
 		d->xdg_shell = wl_registry_bind(registry, id, &xdg_shell_interface, 1);
 		xdg_shell_use_unstable_version(d->xdg_shell, TARGET_XDG_VERSION);
@@ -443,6 +445,8 @@ UwacReturnCode UwacCloseDisplay(UwacDisplay **pdisplay) {
 #endif
 	if (display->xdg_shell)
 		xdg_shell_destroy(display->xdg_shell);
+	if (display->shell)
+		wl_shell_destroy(display->shell);
 	if (display->shm)
 		wl_shm_destroy(display->shm);
 	if (display->subcompositor)

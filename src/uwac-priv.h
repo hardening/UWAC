@@ -77,6 +77,7 @@ struct uwac_display {
 	struct wl_registry *registry;
 	struct wl_compositor *compositor;
 	struct wl_subcompositor *subcompositor;
+	struct wl_shell *shell;
 	struct xdg_shell *xdg_shell;
 #ifdef BUILD_IVI
 	struct ivi_application *ivi_application;
@@ -197,6 +198,7 @@ struct uwac_window {
 	struct wl_callback *frame_callback;
 	UwacBuffer *drawingBuffer, *pendingBuffer;
 	struct wl_surface *surface;
+	struct wl_shell_surface *shell_surface;
 	struct xdg_surface *xdg_surface;
 #ifdef BUILD_IVI
 	struct ivi_surface *ivi_surface;

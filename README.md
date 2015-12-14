@@ -26,7 +26,7 @@ I have tried to minimize the libraries required to compile UWAC, today the depen
 
 * wayland client
 * pixman
-* XKB common
+* xkbcommon
 
 # TODO
 

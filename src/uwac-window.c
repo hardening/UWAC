@@ -201,6 +201,64 @@ static const struct ivi_surface_listener ivi_surface_listener = {
 };
 #endif
 
+void shell_ping(void *data, struct wl_shell_surface *surface, uint32_t serial)
+{
+	wl_shell_surface_pong(surface, serial);
+}
+
+void shell_configure(void *data, struct wl_shell_surface *surface, uint32_t edges,
+		  int32_t width, int32_t height)
+{
+	UwacWindow *window = (UwacWindow *)data;
+	UwacConfigureEvent *event;
+	int ret;
+
+	event = (UwacConfigureEvent *)UwacDisplayNewEvent(window->display, UWAC_EVENT_CONFIGURE);
+	if(!event) {
+		assert(uwacErrorHandler(window->display, UWAC_ERROR_NOMEMORY, "failed to allocate a configure event\n"));
+		return;
+	}
+
+	event->window = window;
+	event->states = 0;
+	if (width && height) {
+		event->width = width;
+		event->height = height;
+
+		UwacWindowDestroyBuffers(window);
+
+		window->width = width;
+		window->stride = width * bppFromShmFormat(window->format);
+		window->height = height;
+
+		ret = UwacWindowShmAllocBuffers(window, UWAC_INITIAL_BUFFERS, window->stride * height,
+				width, height, window->format);
+		if (ret != UWAC_SUCCESS) {
+			assert(uwacErrorHandler(window->display, ret, "failed to reallocate a wayland buffers\n"));
+			window->drawingBuffer = window->pendingBuffer = NULL;
+			return;
+		}
+		window->drawingBuffer = window->pendingBuffer = &window->buffers[0];
+	} else {
+		event->width = window->width;
+		event->height = window->height;
+	}
+
+}
+
+
+void shell_popup_done(void *data, struct wl_shell_surface *surface)
+{
+}
+
+
+static const struct wl_shell_surface_listener shell_listener = {
+	shell_ping,
+	shell_configure,
+	shell_popup_done
+};
+
+
 int UwacWindowShmAllocBuffers(UwacWindow *w, int nbuffers, int allocSize, uint32_t width,
 		uint32_t height, enum wl_shm_format format)
 {
@@ -326,8 +384,12 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 				_WL_FULLSCREEN_SHELL_PRESENT_METHOD_CENTER, NULL);
 #endif
 	} else {
-		uwacErrorHandler(display, UWAC_ERROR_INTERNAL, "no suitable shell to display the surface");
-		goto out_error_shell;
+		w->shell_surface = wl_shell_get_shell_surface(display->shell, w->surface);
+
+		assert(w->shell_surface);
+
+		wl_shell_surface_add_listener(w->shell_surface, &shell_listener, w);
+		wl_shell_surface_set_toplevel(w->shell_surface);
 	}
 
 	wl_list_insert(display->windows.prev, &w->link);
@@ -508,4 +570,6 @@ UwacReturnCode UwacWindowSetFullscreenState(UwacWindow *window, UwacOutput *outp
 void UwacWindowSetTitle(UwacWindow *window, const char *name) {
 	if (window->xdg_surface)
 		xdg_surface_set_title(window->xdg_surface, name);
+	else if (window->shell_surface)
+		wl_shell_surface_set_title(window->shell_surface, name);
 }
