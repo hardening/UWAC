@@ -149,8 +149,7 @@ int uwac_os_epoll_create_cloexec(void)
 	return set_cloexec_or_close(fd);
 }
 
-static int
-create_tmpfile_cloexec(char *tmpname)
+static int create_tmpfile_cloexec(char *tmpname)
 {
 	int fd;
 
@@ -190,8 +189,7 @@ create_tmpfile_cloexec(char *tmpname)
  * If posix_fallocate() is not supported, program may receive
  * SIGBUS on accessing mmap()'ed file contents instead.
  */
-int
-uwac_create_anonymous_file(off_t size)
+int uwac_create_anonymous_file(off_t size)
 {
 	static const char template[] = "/weston-shared-XXXXXX";
 	const char *path;

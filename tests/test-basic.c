@@ -20,7 +20,7 @@
  * OF THIS SOFTWARE.
  */
 #include <stdio.h>
-#include "uwac.h"
+#include <uwac/uwac.h>
 
 int main(int argc, char *argv[]) {
 	UwacDisplay *display;

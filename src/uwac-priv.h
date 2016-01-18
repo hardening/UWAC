@@ -37,7 +37,7 @@
 #include <pixman-1/pixman.h>
 #include <xkbcommon/xkbcommon.h>
 
-#include "uwac.h"
+#include <uwac/uwac.h>
 
 
 extern UwacErrorHandler uwacErrorHandler;
@@ -213,6 +213,7 @@ struct uwac_window {
 
 /* in uwa-display.c */
 UwacEvent *UwacDisplayNewEvent(UwacDisplay *d, int type);
+int UwacDisplayWatchFd(UwacDisplay *display, int fd, uint32_t events, UwacTask *task);
 
 
 /* in uwac-input.c */

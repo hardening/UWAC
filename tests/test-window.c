@@ -21,7 +21,7 @@
  */
 #include <stdio.h>
 #include <assert.h>
-#include "uwac.h"
+#include <uwac/uwac.h>
 
 #include <xkbcommon/xkbcommon.h>
 

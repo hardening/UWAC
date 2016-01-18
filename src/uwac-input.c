@@ -21,13 +21,13 @@
  */
 #include "uwac-priv.h"
 #include "uwac-utils.h"
-#include "uwac.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/timerfd.h>
 #include <sys/epoll.h>
@@ -118,7 +118,7 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard, uint
 {
 	uint32_t *key, *pressedKey;
 	UwacSeat *input = (UwacSeat *)data;
-	int i, found, toMove;
+	int i, found;
 	UwacKeyboardEnterLeaveEvent *event;
 
 	event = (UwacKeyboardEnterLeaveEvent *)UwacDisplayNewEvent(input->display, UWAC_EVENT_KEYBOARD_ENTER);

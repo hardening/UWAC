@@ -28,8 +28,10 @@
  * Functions have been renamed just to prevent name clashes.
  */
 
-#ifndef UWAC_OS_H
-#define UWAC_OS_H
+#ifndef __UWAC_OS_H
+#define __UWAC_OS_H
+
+#include <sys/socket.h>
 
 int uwac_os_socket_cloexec(int domain, int type, int protocol);
 
@@ -41,4 +43,5 @@ int uwac_os_epoll_create_cloexec(void);
 
 int uwac_os_epoll_create_cloexec(void);
 
-#endif
+int uwac_create_anonymous_file(off_t size);
+#endif /* __UWAC_OS_H */

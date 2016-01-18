@@ -21,7 +21,6 @@
  */
 #include "uwac-priv.h"
 #include "uwac-utils.h"
-#include "uwac.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,7 +72,7 @@ static void output_handle_mode(void *data, struct wl_output *wl_output, uint32_t
 		    int width, int height, int refresh)
 {
 	UwacOutput *output = data;
-	UwacDisplay *display = output->display;
+	//UwacDisplay *display = output->display;
 
 	if (output->doneNeeded && output->doneReceived) {
 		/* TODO: we should clear the mode list */

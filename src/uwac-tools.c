@@ -22,7 +22,7 @@
 
 #include <wayland-util.h>
 #include <string.h>
-#include "uwac-tools.h"
+#include <uwac/uwac-tools.h>
 
 /** @brief */
 struct uwac_touch_automata {

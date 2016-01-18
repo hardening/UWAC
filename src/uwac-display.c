@@ -21,7 +21,6 @@
  */
 #include "uwac-priv.h"
 #include "uwac-utils.h"
-#include "uwac.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +29,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/epoll.h>
+
+#include "uwac-os.h"
 
 #define TARGET_COMPOSITOR_INTERFACE 3
 #define TARGET_SHM_INTERFACE 1
@@ -336,6 +338,11 @@ UwacDisplay *UwacOpenDisplay(const char *name, UwacReturnCode *err) {
 	ret->display_fd = wl_display_get_fd(ret->display);
 
 	ret->registry = wl_display_get_registry(ret->display);
+	if (!ret->registry) {
+		*err = UWAC_ERROR_NOMEMORY;
+		goto out_close_epoll;
+	}
+
 	wl_registry_add_listener(ret->registry, &registry_listener, ret);
 
 	if ((wl_display_roundtrip(ret->display) < 0) || (wl_display_roundtrip(ret->display) < 0)) {

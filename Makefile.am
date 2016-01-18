@@ -6,7 +6,8 @@ AM_CPPFLAGS = \
 	$(UWAC_CFLAGS) \
 	-I$(top_builddir)/src \
 	-I$(top_builddir)/protocol \
-	-I$(top_srcdir)/src 
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include 
 
 
 libuwac_la_SOURCES = \
@@ -20,15 +21,16 @@ libuwac_la_SOURCES = \
 	src/uwac-output.c \
 	src/uwac-window.c \
 	src/uwac-tools.c
-libuwac_la_LIBADD = $(UWAC_LIBS) 
+libuwac_la_LIBADD = $(UWAC_LIBS)
+libuwac_la_CFLAGS = -Wall 
 
 libuwacincludedir = $(includedir)/uwac
 libuwacinclude_HEADERS= \
-	src/uwac.h \
-	src/uwac-utils.h
+	include/uwac/uwac.h \
+	include/uwac/uwac-tools.h
 
-nodist_libuwac_la_SOURCES =					\
-	protocol/xdg-shell-protocol.c		\
+nodist_libuwac_la_SOURCES =	\
+	protocol/xdg-shell-protocol.c \
 	protocol/xdg-shell-client-protocol.h
 
 if BUILD_IVI

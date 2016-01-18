@@ -24,7 +24,7 @@
 #define __UWAC_TOOLS_H_
 
 #include <stdbool.h>
-#include <uwac.h>
+#include <uwac/uwac.h>
 
 /** @brief */
 struct uwac_touch_point {

@@ -19,10 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include "uwac-priv.h"
-#include "uwac-utils.h"
-#include "uwac.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +26,11 @@
 #include <unistd.h>
 #include <assert.h>
 #include <sys/mman.h>
+
+#include "uwac-priv.h"
+#include "uwac-utils.h"
+#include "uwac-os.h"
+
 
 #define UWAC_INITIAL_BUFFERS 3
 
@@ -68,6 +69,10 @@ void UwacWindowDestroyBuffers(UwacWindow *w) {
 	free(w->buffers);
 	w->buffers = NULL;
 }
+
+
+int UwacWindowShmAllocBuffers(UwacWindow *w, int nbuffers, int allocSize, uint32_t width,
+		uint32_t height, enum wl_shm_format format);
 
 static void xdg_handle_configure(void *data, struct xdg_surface *surface,
 		 int32_t width, int32_t height,
@@ -331,7 +336,6 @@ UwacBuffer *UwacWindowFindFreeBuffer(UwacWindow *w) {
 
 UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t height, enum wl_shm_format format) {
 	UwacWindow *w;
-	char *tmpname;
 	int allocSize, ret;
 
 	if (!display) {
@@ -362,10 +366,18 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 	w->drawingBuffer = &w->buffers[0];
 
 	w->surface = wl_compositor_create_surface(display->compositor);
+	if (!w->surface) {
+		display->last_error = UWAC_ERROR_NOMEMORY;
+		goto out_error_surface;
+	}
 	wl_surface_set_user_data(w->surface, w);
 
 	if (display->xdg_shell) {
 		w->xdg_surface = xdg_shell_get_xdg_surface(display->xdg_shell, w->surface);
+		if (!w->xdg_surface) {
+			display->last_error = UWAC_ERROR_NOMEMORY;
+			goto out_error_shell;
+		}
 
 		assert(w->xdg_surface);
 
@@ -399,6 +411,7 @@ UwacWindow *UwacCreateWindowShm(UwacDisplay *display, uint32_t width, uint32_t h
 
 out_error_shell:
 	wl_surface_destroy(w->surface);
+out_error_surface:
 	UwacWindowDestroyBuffers(w);
 out_error_free:
 	free(w);
@@ -525,7 +538,6 @@ UwacReturnCode UwacWindowAddDamage(UwacWindow *window, uint32_t x, uint32_t y, u
 
 UwacReturnCode UwacWindowSubmitBuffer(UwacWindow *window, bool copyContentForNextFrame) {
 	UwacBuffer *drawingBuffer = window->drawingBuffer;
-	pixman_box32_t box;
 
 	if (window->pendingBuffer) {
 		/* we already have a pending frame, don't do anything*/
